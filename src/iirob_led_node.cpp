@@ -12,7 +12,7 @@ class LEDNode
 {
 public:
 	//! Constructor.
-	LEDNode(ros::NodeHandle nodeHandle) : m_cancelFlag(false), m_numLeds(0), m_led(0), m_msec(1), as_(nodeHandle, "play_led", boost::bind(&LEDNode::playLed, this, _1), false)
+	LEDNode(ros::NodeHandle nodeHandle) : m_numLeds(0), m_led(0), m_msec(1), as_(nodeHandle, "play_led", boost::bind(&LEDNode::playLed, this, _1), false)
     {
     };
 
@@ -26,11 +26,7 @@ public:
 		}
 	};
 
-	virtual void run();
-
 	bool init(std::string const & port, int const & num);
-
-	void stop() { m_cancelFlag = true;}
 
 	//! Callback function for subscriber.
 	void commandCallback(const std_msgs::String::ConstPtr& msg) {
@@ -41,9 +37,9 @@ public:
 	}
 	void colorCallback(const std_msgs::ColorRGBA::ConstPtr& msg) {
 		ROS_INFO("I heard: [%f %f %f %f %d]", msg->r, msg->g, msg->b, msg->a, m_numLeds );
-		ROS_INFO("[%d]", showDir);
+		ROS_INFO("[%d]", m_showDir);
 		//Entscheidung welche LED-Richtung gezeigt wird
-		switch(showDir) {
+		switch(m_showDir) {
 			case 0:
 				m_led->setRangeRGBf(msg->r, msg->g, msg->b, m_numLeds, 0, 7);
 				ROS_INFO("A");
@@ -74,24 +70,23 @@ public:
 	}
 
 	//Empfangen der Richtung
-	int showDir;
 	void directoryCallback(const std_msgs::String::ConstPtr& msg) {
 		std::string tempMsg = msg->data.c_str();
 		if (tempMsg == "r") {
-			showDir = 0;
+			m_showDir = 0;
 		}
 		else if (tempMsg == "l") {
-			showDir = 1;
+			m_showDir = 1;
 		}
 		else if (tempMsg == "b") {
-			showDir = 2;
+			m_showDir = 2;
 		}
 		else if (tempMsg == "f") {
-			showDir = 3;
+			m_showDir = 3;
 		}
 		else {
 			//Default
-			showDir = 4;
+			m_showDir = 4;
 		}
 	}
 
@@ -105,11 +100,15 @@ public:
         int i = 0;
 
         ROS_INFO("%s starting PlayLed action with duration %f s, frequency %f Hz and color [%f %f %f] [RGB].", ros::this_node::getName().c_str(), goal->duration, goal->frequency, goal->color.r, goal->color.g, goal->color.b);
+        
+        //const std_msgs::ColorRGBA::ConstPtr& msg;
+
+
+
 
         while(true) {
-
-            m_led->setRangeRGBf(goal->color.r, goal->color.g, goal->color.b, m_numLeds, i, i);
-            i++; i %= m_numLeds;
+            m_led->setRangeRGBf(goal->color.r, goal->color.g, goal->color.b, m_numLeds, i, i+1);            
+            i++; i %= m_numLeds;            
 
             time_diff = ros::Time::now().toSec() - begin;
             if (time_diff >= goal->duration) {
@@ -117,7 +116,7 @@ public:
             }
 
             feedback.until_end = time_diff;
-            ROS_DEBUG("%s: PlayLedAction until end %f s", ros::this_node::getName().c_str(), feedback.until_end);
+            ROS_INFO("%s: PlayLedAction until end %f s", ros::this_node::getName().c_str(), feedback.until_end);
             as_.publishFeedback(feedback);
             frequency.sleep();
         }
@@ -128,37 +127,24 @@ public:
     }
 
 protected:
-    actionlib::SimpleActionServer<iirob_led::PlayLedAction> as_;
-    int m_numLeds;
+        
 
 private:
-	bool m_cancelFlag;
-	std::string m_port;
-	irob_hardware::LEDStrip* m_led;
-	int m_msec;
+	int m_msec;	
+	int m_numLeds;
+    irob_hardware::LEDStrip* m_led;
+    int m_showDir;
+    
+    actionlib::SimpleActionServer<iirob_led::PlayLedAction> as_;
 
 };
-
-void LEDNode::run() {
-
-	float hue = 0.0;
-
-	while (! m_cancelFlag ) {
-		hue += 0.01;
-		if (hue >= 1.0)
-			hue -= 1.0;
-		m_led->setAllHue(hue, m_numLeds);
-	}
-
-	m_led->setAllRGB(0, 0, 0, m_numLeds);
-	m_led->setUniRGB(0, 0, 0);
-}
 
 bool LEDNode::init(std::string const & port, int const & num) {
 
 	m_led = new irob_hardware::LEDStrip(port);
 	if (m_led->ready()) {
 		m_numLeds = num;
+		m_showDir = 4;
 
         as_.start();
         ROS_INFO("%s: PlayLed action server started", ros::this_node::getName().c_str());
