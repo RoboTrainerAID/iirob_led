@@ -1,4 +1,8 @@
-#include "ros/ros.h"
+#include <ros/ros.h>
+#include "actionlib/server/simple_action_server.h"
+
+#include "iirob_led/PlayLedAction.h"
+
 #include "std_msgs/String.h"
 #include "std_msgs/ColorRGBA.h"
 
@@ -8,7 +12,9 @@ class LEDNode
 {
 public:
 	//! Constructor.
-	LEDNode() : m_cancelFlag(false), m_numLeds(0), m_led(0), m_msec(1) {};
+	LEDNode(ros::NodeHandle nodeHandle) : m_cancelFlag(false), m_numLeds(0), m_led(0), m_msec(1), as_(nodeHandle, "play_led", boost::bind(&LEDNode::playLed, this, _1), false)
+    {
+    };
 
 	//! Destructor.
 	~LEDNode(){
@@ -35,23 +41,23 @@ public:
 	}
 	void colorCallback(const std_msgs::ColorRGBA::ConstPtr& msg) {
 		ROS_INFO("I heard: [%f %f %f %f %d]", msg->r, msg->g, msg->b, msg->a, m_numLeds );
-		ROS_INFO("[%f]", showDir);
+		ROS_INFO("[%d]", showDir);
 		//Entscheidung welche LED-Richtung gezeigt wird
 		switch(showDir) {
 			case 0:
-				m_led->setMyAllRGBf(msg->r, msg->g, msg->b, m_numLeds, 0, 7);
+				m_led->setRangeRGBf(msg->r, msg->g, msg->b, m_numLeds, 0, 7);
 				ROS_INFO("A");
 				break;
 			case 1:
-				m_led->setMyAllRGBf(msg->r, msg->g, msg->b, m_numLeds, 7, 14);
+				m_led->setRangeRGBf(msg->r, msg->g, msg->b, m_numLeds, 7, 14);
 				ROS_INFO("B");
 				break;
 			case 2:
-				m_led->setMyAllRGBf(msg->r, msg->g, msg->b, m_numLeds, 14, 22);
+				m_led->setRangeRGBf(msg->r, msg->g, msg->b, m_numLeds, 14, 22);
 				ROS_INFO("C");
 				break;
 			case 3:
-				m_led->setMyAllRGBf(msg->r, msg->g, msg->b, m_numLeds, 23, 31);
+				m_led->setRangeRGBf(msg->r, msg->g, msg->b, m_numLeds, 23, 31);
 				ROS_INFO("D");
 				break;
 			case 4:
@@ -89,15 +95,45 @@ public:
 		}
 	}
 
-	//! The actual message.
-	std::string message;
+	void playLed(const iirob_led::PlayLedGoalConstPtr& goal)
+    {
+        iirob_led::PlayLedFeedback feedback;
+        iirob_led::PlayLedResult result;
+        double begin = ros::Time::now().toSec();
+        double time_diff;
+        ros::Rate frequency(goal->frequency);
+        int i = 0;
 
+        ROS_INFO("%s starting PlayLed action with duration %f s, frequency %f Hz and color [%f %f %f] [RGB].", ros::this_node::getName().c_str(), goal->duration, goal->frequency, goal->color.r, goal->color.g, goal->color.b);
+
+        while(true) {
+
+            m_led->setRangeRGBf(goal->color.r, goal->color.g, goal->color.b, m_numLeds, i, i);
+            i++; i %= m_numLeds;
+
+            time_diff = ros::Time::now().toSec() - begin;
+            if (time_diff >= goal->duration) {
+                break;
+            }
+
+            feedback.until_end = time_diff;
+            ROS_DEBUG("%s: PlayLedAction until end %f s", ros::this_node::getName().c_str(), feedback.until_end);
+            as_.publishFeedback(feedback);
+            frequency.sleep();
+        }
+
+        m_led->setAllRGB(0, 0, 0, m_numLeds);
+        result.real_duration = time_diff;
+        as_.setSucceeded(result);
+    }
+
+protected:
+    actionlib::SimpleActionServer<iirob_led::PlayLedAction> as_;
+    int m_numLeds;
 
 private:
 	bool m_cancelFlag;
-	//OpenThreads::Mutex m_ledMutex;
 	std::string m_port;
-	int m_numLeds;
 	irob_hardware::LEDStrip* m_led;
 	int m_msec;
 
@@ -112,12 +148,10 @@ void LEDNode::run() {
 		if (hue >= 1.0)
 			hue -= 1.0;
 		m_led->setAllHue(hue, m_numLeds);
-		//OpenThreads::Thread::microSleep(m_msec*1000);
 	}
 
 	m_led->setAllRGB(0, 0, 0, m_numLeds);
 	m_led->setUniRGB(0, 0, 0);
-
 }
 
 bool LEDNode::init(std::string const & port, int const & num) {
@@ -125,113 +159,47 @@ bool LEDNode::init(std::string const & port, int const & num) {
 	m_led = new irob_hardware::LEDStrip(port);
 	if (m_led->ready()) {
 		m_numLeds = num;
+
+        as_.start();
+        ROS_INFO("%s: PlayLed action server started", ros::this_node::getName().c_str());
+
 		return true;
 	}
-
-
 	return false;
-
 }
 
 
 int main(int argc, char **argv)
 {
 
-	int mode = 0;
-	int num = 1;
-	float speed = 1.0;
-	bool printDebug = false;
-	bool override = true;
+    std::string port;
+	int num;
+	bool override;
 
-	std::string port;
-#ifdef IROB_OS_WIN32
-	port = "COM5";
-#else
-	port = "/dev/ttyUSB0";
-#endif
+	ros::init(argc, argv, "iirob_led_node");
+	ros::NodeHandle nodeHandle("~");
 
-	std::cout << std::endl << "Supported command line options:"
-			<< std::endl << "  -p <port>  default: COM5, /dev/ttyUSB0"
-			<< std::endl << "  -n <num>   number of leds on string (RGB triples)"
-			<< std::endl << "  -X         override current limiter (max. 8 LEDs w/o ext. supply)"
-			<< std::endl << "             WARNING: improper usage may fry USB port!"
-			<< std::endl;
+    nodeHandle.param<std::string>("port", port, "/dev/ttyUSB0");
+    nodeHandle.param<int>("led_num", num, 1);
+    nodeHandle.param<bool>("override", override, false);
 
-	for (int i=1; i<argc; ++i) {
-		if ((i < argc-1) && !strcmp(argv[i], "-n"))
-			num = atoi(argv[i+1]);
-		else if (!strcmp(argv[i], "-X"))
-			override = true;
-		else if ((i < argc-1) && !strcmp(argv[i], "-p"))
-			port = argv[i+1];
-	}
+    if ((!override) && (num>8))
+        num = 8;
 
-	num = 31;
+    ROS_INFO("IIROB-LED node %s: Initializing ledNode on port %s with %d LEDs.", ros::this_node::getName().c_str(), port.c_str(), num);
+    LEDNode *ledNode = new LEDNode(nodeHandle);
+    if (ledNode->init(port, num)) {
 
-	if ((!override) && (num>8))
-		num = 8;
+        ros::Subscriber sub = nodeHandle.subscribe("led_command", 1000, &LEDNode::commandCallback, ledNode);
+        ros::Subscriber sub3 = nodeHandle.subscribe("chosen_directory", 1000, &LEDNode::directoryCallback, ledNode);
+        ros::Subscriber sub2 = nodeHandle.subscribe("led_color", 1000, &LEDNode::colorCallback, ledNode);
 
-	LEDNode *ledNode = new LEDNode ();
-	if (! ledNode->init(port, num)) {
-		std::cerr << "Failed to init LEDNode" << std::endl;
-		return (-1);
-	}
+        ros::spin();
 
-	//ledNode->start();
-
-
-	/**
-	 * The ros::init() function needs to see argc and argv so that it can perform
-	 * any ROS arguments and name remapping that were provided at the command line. For programmatic
-	 * remappings you can use a different version of init() which takes remappings
-	 * directly, but for most command-line programs, passing argc and argv is the easiest
-	 * way to do it.  The third argument to init() is the name of the node.
-	 *
-	 * You must call one of the versions of ros::init() before using any other
-	 * part of the ROS system.
-	 */
-	ros::init(argc, argv, "LEDROSNode");
-
-	/**
-	 * NodeHandle is the main access point to communications with the ROS system.
-	 * The first NodeHandle constructed will fully initialize this node, and the last
-	 * NodeHandle destructed will close down the node.
-	 */
-	ros::NodeHandle n;
-
-	/**
-	 * The subscribe() call is how you tell ROS that you want to receive messages
-	 * on a given topic.  This invokes a call to the ROS
-	 * master node, which keeps a registry of who is publishing and who
-	 * is subscribing.  Messages are passed to a callback function, here
-	 * called chatterCallback.  subscribe() returns a Subscriber object that you
-	 * must hold on to until you want to unsubscribe.  When all copies of the Subscriber
-	 * object go out of scope, this callback will automatically be unsubscribed from
-	 * this topic.
-	 *
-	 * The second parameter to the subscribe() function is the size of the message
-	 * queue.  If messages are arriving faster than they are being processed, this
-	 * is the number of messages that will be buffered up before beginning to throw
-	 * away the oldest ones.
-	 */
-
-	ros::Subscriber sub = n.subscribe("ledCommand", 1000, &LEDNode::commandCallback, ledNode);
-	ros::Subscriber sub3 = n.subscribe("chosen_Directory", 1000, &LEDNode::directoryCallback, ledNode); //hinzugefügt
-	ros::Subscriber sub2 = n.subscribe("ledColor", 1000, &LEDNode::colorCallback, ledNode);
-
-
-	/**
-	 * ros::spin() will enter a loop, pumping callbacks.  With this version, all
-	 * callbacks will be called from within this thread (the main one).  ros::spin()
-	 * will exit when Ctrl-C is pressed, or the node is shutdown by the master.
-	 */
-	ros::spin();
-
-	std::cout << "Canceled" << std::endl;
-
-	//ledNode->stop();
-	//ledNode->join();
-	delete ledNode;
-
-	return 0;
+        delete ledNode;
+    }
+    else {
+        ROS_ERROR("IIROB-LED node %s: Initializing ledNode on port %s with %d LEDs failed!", ros::this_node::getName().c_str(), port.c_str(), num);
+    }
+    return 0;
 }
