@@ -22,15 +22,15 @@ namespace irob_hardware {
 		/** Returns logarithmic value for perception based scaling **/
 		unsigned int ledLog16(unsigned char col);
 		float ledLogf(float col);
-	
+
 		/** Returns true if the serial port was connected successfully. */
 		bool ready();
-		
+
 		/** Send n bytes of the specified buffer */
 		bool send(unsigned char* buf, int n);
 		/** Receive n bytes */
 		bool receive(unsigned char* buf, int n);
-		
+
 
 		/** Set RGB value of n RGB triples (3 floats per led)*/
 		bool setRGB(unsigned char* rgb, int n, bool log=false);
@@ -60,14 +60,14 @@ namespace irob_hardware {
 	/**Hinzugefügt um einzelne Bereiche des Streifens anzusteuern*/
 	bool setMyRGB(unsigned char* rgb, int n, int b, int e, bool log=false);
 	/** Set RGB value of all leds */
-	bool setMyAllRGB(unsigned char red, unsigned char green, unsigned char blue, int n, int b, int e, bool log=true);
+	bool setRangeRGB(unsigned char red, unsigned char green, unsigned char blue, int n, int b, int e, bool log=true);
 	/** As above, float [0.1], opt. logarithmic scaling */
-	bool setMyAllRGBf(float red, float green, float blue, int n, int b, int e, bool log=true);
-		
-		
+	bool setRangeRGBf(float red, float green, float blue, int n, int b, int e, bool log=true);
+
+
 	private:
 		LEDStrip() {}
-		
+
 		SerialPort* com;
 		bool printDebug;
 		int nn;

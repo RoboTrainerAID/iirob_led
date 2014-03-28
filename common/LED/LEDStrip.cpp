@@ -51,10 +51,10 @@ float LEDStrip::ledLogf(float col) {
 
 LEDStrip::LEDStrip(const std::string& port, bool printDebug)
 : printDebug(printDebug) {
-	
+
 	printf("Creating  serial port on %s... ", port.c_str());
 	com = CSerialPortFactory::CreateSerialPort(port);
-	
+
 	SerialPort::Attributes attr;
 		attr.baudRate = SerialPort::BaudRate_921600;
 		//attr.flowControl = SerialPort::FlowControl_off;
@@ -62,7 +62,7 @@ LEDStrip::LEDStrip(const std::string& port, bool printDebug)
 		attr.stopBits = SerialPort::StopBits_1;
 		//attr.timeout = 500;
   com->setAttributes(attr);
-	
+
 	printf("%s\nOpening   serial port... ", (com!=NULL)?"OK":"FAILED");
 	bool ok = com->open();
 	printf("%s\n", (ok)?"OK":"FAILED");
@@ -119,7 +119,7 @@ bool LEDStrip::setRGB(unsigned char* rgb, int n, bool log) {
 	buf[0] = LEDStrip::START;
 	buf[1] = (char)n;
 	if (log) {
-		for (int i = 2; i<(n*3+2); i++) 
+		for (int i = 2; i<(n*3+2); i++)
 			buf[i] = led_lut[*rgb++];
 	}
 	else {
@@ -168,7 +168,7 @@ bool LEDStrip::setRGBf(float* rgb, int n, bool log) {
 		rgbtemp[i] = (unsigned char) ((*rgb++)*255.0);
 	return LEDStrip::setRGB(rgbtemp, n, log);
 }
-	
+
 bool LEDStrip::setHue(float* hue, int n, bool log) {
 	float red, green, blue;
 	for (int i = 1; i<(n*3); i+=3) {
@@ -254,11 +254,11 @@ bool LEDStrip::setMyRGB(unsigned char* rgb, int n, int b, int e, bool log) {
 	buf[0] = LEDStrip::START;
 	buf[1] = (char)n;
 	if (log) {
-		for (int i = 2+(b*3); i<(e*3+2); i++) 
+		for (int i = 2+(b*3); i<(e*3+2); i++)
 			buf[i] = led_lut[*rgb++];
 	}
 	else {
-		for (int i = 2+(b*3); i<(e*3+2); i++) 
+		for (int i = 2+(b*3); i<(e*3+2); i++)
 			buf[i] = *rgb++;
 	}
 	buf[n*3+2] = LEDStrip::END;
@@ -267,7 +267,7 @@ bool LEDStrip::setMyRGB(unsigned char* rgb, int n, int b, int e, bool log) {
 	ok &= (buf[0]==LEDStrip::OK);
 	return ok;
 }
-bool LEDStrip::setMyAllRGB(unsigned char red, unsigned char green, unsigned char blue, int n, int b, int e, bool log){
+bool LEDStrip::setRangeRGB(unsigned char red, unsigned char green, unsigned char blue, int n, int b, int e, bool log){
 	if (n*3>sizeof(rgbtemp))
 		return false;
 	for (int i = 0; i<(n*3); i+=3) {
@@ -278,7 +278,7 @@ bool LEDStrip::setMyAllRGB(unsigned char red, unsigned char green, unsigned char
 	return setMyRGB(rgbtemp, n, b, e, log);
 }
 
-bool LEDStrip::setMyAllRGBf(float red, float green, float blue, int n, int b, int e, bool log) {
-	return LEDStrip::setMyAllRGB((unsigned char)(red*255.0), (unsigned char)(green*255.0),
+bool LEDStrip::setRangeRGBf(float red, float green, float blue, int n, int b, int e, bool log) {
+	return LEDStrip::setRangeRGB((unsigned char)(red*255.0), (unsigned char)(green*255.0),
 			(unsigned char)(blue*255.0), n, b, e, log);
 }
