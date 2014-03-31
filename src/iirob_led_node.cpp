@@ -2,6 +2,7 @@
 #include "actionlib/server/simple_action_server.h"
 
 #include "iirob_led/PlayLedAction.h"
+#include "iirob_led/SetLedDirectory.h"
 
 #include "std_msgs/String.h"
 #include "std_msgs/ColorRGBA.h"
@@ -90,6 +91,15 @@ public:
 		}
 	}
 
+	bool set_led_directory(iirob_led::SetLedDirectory::Request &req,
+                           iirob_led::SetLedDirectory::Response &res)
+    {
+        ROS_INFO("I heard: [%f %f %f %f %d %d]",
+                 req.color.r, req.color.g, req.color.b, req.color.a, req.start_led, req.end_led);
+        m_led->setRangeRGBf(req.color.r, req.color.g, req.color.b, m_numLeds, req.start_led, req.end_led);
+        return true;
+    }
+
 	void playLed(const iirob_led::PlayLedGoalConstPtr& goal)
     {
         iirob_led::PlayLedFeedback feedback;
@@ -98,27 +108,74 @@ public:
         double time_diff;
         ros::Rate frequency(goal->frequency);
         int i = 0;
+        int num_leds_middle, num_leds_begin_end, factor;
+        int start_led = goal->start_led;
+        int end_led = goal->end_led;
+        int directory_size = goal->directory_size;
+        float hue = 0.0;
 
-        ROS_INFO("%s starting PlayLed action with duration %f s, frequency %f Hz and color [%f %f %f] [RGB].", ros::this_node::getName().c_str(), goal->duration, goal->frequency, goal->color.r, goal->color.g, goal->color.b);
-        
-        //const std_msgs::ColorRGBA::ConstPtr& msg;
+        if (end_led >= m_numLeds) {
+            end_led = m_numLeds-1;
+        }
 
+//         while (! m_cancelFlag ) {
+//         hue += 0.01;
+//         if (hue >= 1.0)
+//             hue -= 1.0;
+//         m_led->setAllHue(hue, m_numLeds);
+//         //OpenThreads::Thread::microSleep(m_msec*1000);
+//     }
 
-
+        ROS_INFO("%s starting PlayLed action with duration %f s, frequency %f Hz, color [%f %f %f] [RGB].", ros::this_node::getName().c_str(), goal->duration, goal->frequency, goal->color.r, goal->color.g, goal->color.b);
 
         while(true) {
-            m_led->setRangeRGBf(goal->color.r, goal->color.g, goal->color.b, m_numLeds, i, i+1);            
-            i++; i %= m_numLeds;            
 
-            time_diff = ros::Time::now().toSec() - begin;
             if (time_diff >= goal->duration) {
                 break;
             }
 
+            if (start_led == 0 && end_led == 0 && directory_size == 0) {
+                hue += 0.01;
+                if (hue >= 1.0) {
+                    hue -= 1.0;
+                }
+                m_led->setAllHue(hue, m_numLeds);
+            }
+            else if (goal->directory_size == 0) {
+                m_led->setRangeRGBf(goal->color.r, goal->color.g, goal->color.b, m_numLeds, start_led, end_led);
+            }
+            else {
+                if (goal->directory_size < 3) {
+                    m_led->setRangeRGBf(goal->color.r, goal->color.g, goal->color.b, m_numLeds, i, i+directory_size);
+                }
+                else {
+                    num_leds_begin_end = directory_size/3;
+                    num_leds_middle = 2*num_leds_begin_end;
+                    for (int j = 1; j <= num_leds_begin_end; j++) {
+                        factor = 255.0/num_leds_begin_end*j;
+                        m_led->setRangeRGBf((goal->color.r)*factor, (goal->color.g)*factor, (goal->color.b)*factor, m_numLeds,
+                                            i+j-1, i+j-1);
+                    }
+                    m_led->setRangeRGBf(goal->color.r, goal->color.g, goal->color.b, m_numLeds,
+                                            i+num_leds_begin_end, i+num_leds_begin_end+num_leds_middle);
+                    for (int j = 1; j <= num_leds_begin_end; j++) {
+                        factor = 255/num_leds_begin_end*(num_leds_begin_end-j+1);
+                        m_led->setRangeRGBf((goal->color.r)*factor, (goal->color.g)*factor, (goal->color.b)*factor, m_numLeds,
+                                            i+num_leds_begin_end+num_leds_middle+j, i+num_leds_begin_end+num_leds_middle+j);
+                    }
+                }
+                i++;
+                i = (i+directory_size)%end_led;
+                if (i < start_led) {
+                    i = start_led;
+                }
+            }
             feedback.until_end = time_diff;
             ROS_INFO("%s: PlayLedAction until end %f s", ros::this_node::getName().c_str(), feedback.until_end);
             as_.publishFeedback(feedback);
+
             frequency.sleep();
+            time_diff = ros::Time::now().toSec() - begin;
         }
 
         m_led->setAllRGB(0, 0, 0, m_numLeds);
@@ -126,15 +183,12 @@ public:
         as_.setSucceeded(result);
     }
 
-protected:
-        
-
 private:
-	int m_msec;	
-	int m_numLeds;
+    int m_msec;
+    int m_numLeds;
     irob_hardware::LEDStrip* m_led;
     int m_showDir;
-    
+
     actionlib::SimpleActionServer<iirob_led::PlayLedAction> as_;
 
 };
@@ -179,6 +233,9 @@ int main(int argc, char **argv)
         ros::Subscriber sub = nodeHandle.subscribe("led_command", 1000, &LEDNode::commandCallback, ledNode);
         ros::Subscriber sub3 = nodeHandle.subscribe("chosen_directory", 1000, &LEDNode::directoryCallback, ledNode);
         ros::Subscriber sub2 = nodeHandle.subscribe("led_color", 1000, &LEDNode::colorCallback, ledNode);
+
+        ros::ServiceServer set_led_directory_srv = nodeHandle.advertiseService("set_led_directory", &LEDNode::set_led_directory, ledNode);
+        ROS_INFO("%s: Service for set motor rotational speed [rpm] started on: %s", ros::this_node::getName().c_str(), set_led_directory_srv.getService().c_str());
 
         ros::spin();
 

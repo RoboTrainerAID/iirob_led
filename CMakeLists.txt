@@ -14,6 +14,11 @@ find_package(catkin REQUIRED COMPONENTS
 ## Declare ROS messages, services and actions ##
 ################################################
 
+add_service_files(
+  FILES
+  SetLedDirectory.srv
+)
+
 add_action_files(
   FILES
   PlayLed.action
