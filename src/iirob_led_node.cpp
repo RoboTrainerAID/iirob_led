@@ -108,11 +108,12 @@ public:
         double time_diff;
         ros::Rate frequency(goal->frequency);
         int i = 0;
-        int num_leds_middle, num_leds_begin_end, factor;
+        int num_leds_middle, num_leds_begin_end;
         int start_led = goal->start_led;
         int end_led = goal->end_led;
         int directory_size = goal->directory_size;
         float hue = 0.0;
+        float factor;
 
         if (end_led >= m_numLeds) {
             end_led = m_numLeds-1;
@@ -126,7 +127,9 @@ public:
 //         //OpenThreads::Thread::microSleep(m_msec*1000);
 //     }
 
-        ROS_INFO("%s starting PlayLed action with duration %f s, frequency %f Hz, color [%f %f %f] [RGB].", ros::this_node::getName().c_str(), goal->duration, goal->frequency, goal->color.r, goal->color.g, goal->color.b);
+        ROS_INFO("%s starting PlayLed action with duration %f s, frequency %f Hz, color [%f %f %f] [RGB]. Duration: %f sec, frequency: %f Hz, start led: %d, end led: %d, directory: %d",
+                 ros::this_node::getName().c_str(), goal->duration, goal->frequency,
+                 goal->color.r, goal->color.g, goal->color.b, goal->duration, goal->frequency, goal->start_led, goal->end_led, goal->directory_size);
 
         while(true) {
 
@@ -149,17 +152,19 @@ public:
                     m_led->setRangeRGBf(goal->color.r, goal->color.g, goal->color.b, m_numLeds, i, i+directory_size);
                 }
                 else {
+                    m_led->setAllRGB(0, 0, 0, m_numLeds);
                     num_leds_begin_end = directory_size/3;
                     num_leds_middle = 2*num_leds_begin_end;
                     for (int j = 1; j <= num_leds_begin_end; j++) {
-                        factor = 255.0/num_leds_begin_end*j;
+                        factor = (1.0/num_leds_begin_end)*j;
+                        ROS_INFO("%f", factor);
                         m_led->setRangeRGBf((goal->color.r)*factor, (goal->color.g)*factor, (goal->color.b)*factor, m_numLeds,
                                             i+j-1, i+j-1);
                     }
                     m_led->setRangeRGBf(goal->color.r, goal->color.g, goal->color.b, m_numLeds,
                                             i+num_leds_begin_end, i+num_leds_begin_end+num_leds_middle);
                     for (int j = 1; j <= num_leds_begin_end; j++) {
-                        factor = 255/num_leds_begin_end*(num_leds_begin_end-j+1);
+                        factor = (1.0/num_leds_begin_end)*(num_leds_begin_end-j+1);
                         m_led->setRangeRGBf((goal->color.r)*factor, (goal->color.g)*factor, (goal->color.b)*factor, m_numLeds,
                                             i+num_leds_begin_end+num_leds_middle+j, i+num_leds_begin_end+num_leds_middle+j);
                     }
