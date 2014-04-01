@@ -127,7 +127,7 @@ public:
 //         //OpenThreads::Thread::microSleep(m_msec*1000);
 //     }
 
-        ROS_INFO("%s starting PlayLed action with duration %f s, frequency %f Hz, color [%f %f %f] [RGB]. Duration: %f sec, frequency: %f Hz, start led: %d, end led: %d, directory: %d",
+        ROS_DEBUG("%s starting PlayLed action with duration %f s, frequency %f Hz, color [%f %f %f] [RGB]. Duration: %f sec, frequency: %f Hz, start led: %d, end led: %d, directory: %d",
                  ros::this_node::getName().c_str(), goal->duration, goal->frequency,
                  goal->color.r, goal->color.g, goal->color.b, goal->duration, goal->frequency, goal->start_led, goal->end_led, goal->directory_size);
 
@@ -176,7 +176,7 @@ public:
                 }
             }
             feedback.until_end = time_diff;
-            ROS_INFO("%s: PlayLedAction until end %f s", ros::this_node::getName().c_str(), feedback.until_end);
+            ROS_DEBUG("%s: PlayLedAction until end %f s", ros::this_node::getName().c_str(), feedback.until_end);
             as_.publishFeedback(feedback);
 
             frequency.sleep();
