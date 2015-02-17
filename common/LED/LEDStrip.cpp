@@ -4,6 +4,8 @@
 #include <cstdio>
 #include <cmath>
 
+#define THREEWIRE
+
 using namespace irob_hardware;
 
 const unsigned char LEDStrip::led_lut[256] = {
@@ -113,39 +115,34 @@ bool LEDStrip::receive(unsigned char* buf, int n) {
 }
 
 bool LEDStrip::setRGB(unsigned char* rgb, int n, bool log) {
-	if ((n*3+3)>sizeof(buf))
+	if ((n*3+4)>sizeof(buf))
 		return false;
 	bool ok = true;
 	buf[0] = LEDStrip::START;
-	buf[1] = (char)n;
-	if (log) {
-		for (int i = 2; i<(n*3+2); i++)
-			buf[i] = led_lut[*rgb++];
-	}
-	else {
-		for (int i = 2; i<(n*3+2); i++)
-			buf[i] = *rgb++;
-	}
-	buf[n*3+2] = LEDStrip::END;
-	ok &= send(buf, n*3+3);
+	buf[1] = (char)(n>>8);
+	buf[2] = (char)n;
+	for (int i = 3; i<(n*3+3); i++)
+		buf[i] = (log?led_lut[*rgb++]:*rgb++);
+	buf[n*3+3] = LEDStrip::END;
+	ok &= send(buf, n*3+4);
 	ok &= receive(buf, 1);
 	ok &= (buf[0]==LEDStrip::OK);
 	return ok;
 }
 
 bool LEDStrip::setUniRGB(unsigned int red, unsigned int green, unsigned int blue) {
-	printf("r %i g %i b %i\n", red, green, blue);
 	bool ok = true;
 	buf[0] = LEDStrip::START;
 	buf[1] = 0;
-	buf[2] = red;
-	buf[3] = red >> 8;
-	buf[4] = green;
-	buf[5] = green >> 8;
-	buf[6] = blue;
-	buf[7] = blue >> 8;
-	buf[8] = LEDStrip::END;
-	ok &= send(buf, 9);
+	buf[2] = 0;
+	buf[3] = red;
+	buf[4] = red >> 8;
+	buf[5] = green;
+	buf[6] = green >> 8;
+	buf[7] = blue;
+	buf[8] = blue >> 8;
+	buf[9] = LEDStrip::END;
+	ok &= send(buf, 10);
 	ok &= receive(buf, 1);
 	ok &= (buf[0]==LEDStrip::OK);
 	return ok;
@@ -184,9 +181,15 @@ bool LEDStrip::setHue(float* hue, int n, bool log) {
 			case 5: red = 1.0;      green = 0.0;      blue = 1.0-*hue; break;
 			default:red = 0.0;      green = 0.0;      blue = 0.0;      break;
 		}
+#ifdef THREEWIRE
+		rgbtemp[i]   = (unsigned char)(green*255.0);
+		rgbtemp[i+1] = (unsigned char)(red*255.0);
+		rgbtemp[i+2] = (unsigned char)(blue*255.0);
+#else
 		rgbtemp[i]   = (unsigned char)(blue*255.0);
 		rgbtemp[i+1] = (unsigned char)(green*255.0);
 		rgbtemp[i+2] = (unsigned char)(red*255.0);
+#endif
 		hue++;
 	}
 	return LEDStrip::setRGB(rgbtemp, n, log);
@@ -196,9 +199,15 @@ bool LEDStrip::setAllRGB(unsigned char red, unsigned char green, unsigned char b
 	if (n*3>sizeof(rgbtemp))
 		return false;
 	for (int i = 0; i<(n*3); i+=3) {
-		rgbtemp[i]   = green;//blue; hier wurde etwas vertauscht
-		rgbtemp[i+1] = red; //green;
-		rgbtemp[i+2] = blue;//red;
+#ifdef THREEWIRE
+		rgbtemp[i]   = green;
+		rgbtemp[i+1] = red;
+		rgbtemp[i+2] = blue;
+#else
+		rgbtemp[i]   = blue;
+		rgbtemp[i+1] = green;
+		rgbtemp[i+2] = red;
+#endif
 	}
 	return setRGB(rgbtemp, n, log);
 }
@@ -246,34 +255,36 @@ std::vector<float> LEDStrip::hueToRGB(float hue) {
 	return rgb;
 }
 
-//Eigene Methoden um einzelne Bereiche des LED-Strips anzusteuern
+//Methods for modifying individual parts of the strip
 bool LEDStrip::setMyRGB(unsigned char* rgb, int n, int b, int e, bool log) {
-	if ((n*3+3)>sizeof(buf))
+	if ((n*3+4)>sizeof(buf))
 		return false;
 	bool ok = true;
 	buf[0] = LEDStrip::START;
-	buf[1] = (char)n;
-	if (log) {
-		for (int i = 2+(b*3); i<(e*3+2); i++)
-			buf[i] = led_lut[*rgb++];
-	}
-	else {
-		for (int i = 2+(b*3); i<(e*3+2); i++)
-			buf[i] = *rgb++;
-	}
-	buf[n*3+2] = LEDStrip::END;
-	ok &= send(buf, n*3+3);
+	buf[1] = (char)(n>>8);
+	buf[2] = (char)n;
+	for (int i = 2+(b*3); i<(e*3+2); i++)
+		buf[i] = (log?led_lut[*rgb++]:*rgb++);
+	buf[n*3+3] = LEDStrip::END;
+	ok &= send(buf, n*3+4);
 	ok &= receive(buf, 1);
 	ok &= (buf[0]==LEDStrip::OK);
 	return ok;
 }
+
 bool LEDStrip::setRangeRGB(unsigned char red, unsigned char green, unsigned char blue, int n, int b, int e, bool log){
 	if (n*3>sizeof(rgbtemp))
 		return false;
 	for (int i = 0; i<(n*3); i+=3) {
-		rgbtemp[i]   = green;//blue; hier wurde etwas vertauscht
-		rgbtemp[i+1] = red; //green;
-		rgbtemp[i+2] = blue;//red;
+#ifdef THREEWIRE
+		rgbtemp[i]   = green;
+		rgbtemp[i+1] = red;
+		rgbtemp[i+2] = blue;
+#else
+		rgbtemp[i]   = blue;
+		rgbtemp[i+1] = green;
+		rgbtemp[i+2] = red;
+#endif
 	}
 	return setMyRGB(rgbtemp, n, b, e, log);
 }

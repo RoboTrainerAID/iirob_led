@@ -3,6 +3,7 @@
 
 #include "../SERIAL/SerialPortFactory.h"
 
+#define MAX_LED 512
 
 namespace irob_hardware {
 
@@ -57,7 +58,7 @@ namespace irob_hardware {
 		/** Returns RGB for hue value [0,1] (S,V = 1.0) */
 		std::vector<float> hueToRGB(float hue);
 
-	/**Hinzugefügt um einzelne Bereiche des Streifens anzusteuern*/
+	/** Methods for modifying individual parts of the strip */
 	bool setMyRGB(unsigned char* rgb, int n, int b, int e, bool log=false);
 	/** Set RGB value of all leds */
 	bool setRangeRGB(unsigned char red, unsigned char green, unsigned char blue, int n, int b, int e, bool log=true);
@@ -71,8 +72,8 @@ namespace irob_hardware {
 		SerialPort* com;
 		bool printDebug;
 		int nn;
-		unsigned char buf[512];
-		unsigned char rgbtemp[512];
+		unsigned char buf[MAX_LED*3+4];
+		unsigned char rgbtemp[MAX_LED*3];
 	};
 
 }
