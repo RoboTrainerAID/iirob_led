@@ -59,7 +59,7 @@ namespace irob_hardware {
 		std::vector<float> hueToRGB(float hue);
 
 	/** Methods for modifying individual parts of the strip */
-	bool setMyRGB(unsigned char* rgb, int n, int b, int e, bool log=false);
+	bool setXRangeRGB(unsigned char* rgb, int n, int b, int e, bool log=false);
 	/** Set RGB value of all leds */
 	bool setRangeRGB(unsigned char red, unsigned char green, unsigned char blue, int n, int b, int e, bool log=true);
 	/** As above, float [0.1], opt. logarithmic scaling */

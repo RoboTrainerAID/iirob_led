@@ -256,14 +256,14 @@ std::vector<float> LEDStrip::hueToRGB(float hue) {
 }
 
 //Methods for modifying individual parts of the strip
-bool LEDStrip::setMyRGB(unsigned char* rgb, int n, int b, int e, bool log) {
+bool LEDStrip::setXRangeRGB(unsigned char* rgb, int n, int b, int e, bool log) {
 	if ((n*3+4)>sizeof(buf))
 		return false;
 	bool ok = true;
 	buf[0] = LEDStrip::START;
 	buf[1] = (char)(n>>8);
 	buf[2] = (char)n;
-	for (int i = 2+(b*3); i<(e*3+2); i++)
+	for (int i = 2+(b*3)+1; i<(e*3+2)+1; i++) //+1
 		buf[i] = (log?led_lut[*rgb++]:*rgb++);
 	buf[n*3+3] = LEDStrip::END;
 	ok &= send(buf, n*3+4);
@@ -286,7 +286,7 @@ bool LEDStrip::setRangeRGB(unsigned char red, unsigned char green, unsigned char
 		rgbtemp[i+2] = red;
 #endif
 	}
-	return setMyRGB(rgbtemp, n, b, e, log);
+	return setXRangeRGB(rgbtemp, n, b, e, log);
 }
 
 bool LEDStrip::setRangeRGBf(float red, float green, float blue, int n, int b, int e, bool log) {
