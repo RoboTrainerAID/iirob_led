@@ -35,7 +35,7 @@ generate_messages(
 ###################################
 catkin_package(
  INCLUDE_DIRS common/LED common/SERIAL
- LIBRARIES iirob_led
+ LIBRARIES ${PROJECT_NAME}
  CATKIN_DEPENDS message_runtime roscpp std_msgs actionlib_msgs
 #  DEPENDS system_lib
 )
@@ -56,7 +56,7 @@ include_directories(
 add_definitions( -DIROB_EXPORT= )
 
 ## Declare a cpp library
-add_library(iirob_led
+add_library(${PROJECT_NAME}
   common/LED/LEDStrip.cpp
   common/LED/LEDModul.cpp
   common/SERIAL/SerialPort.cpp
@@ -64,10 +64,10 @@ add_library(iirob_led
   common/SERIAL/SerialPortFactory.cpp
 )
 
-add_executable(iirob_led_node src/iirob_led_node.cpp)
-add_dependencies(iirob_led_node iirob_led_generate_messages_cpp)
-target_link_libraries(iirob_led_node
-  iirob_led
+add_executable(${PROJECT_NAME}_node src/iirob_led_node.cpp)
+add_dependencies(${PROJECT_NAME}_node ${PROJECT_NAME}_generate_messages_cpp)
+target_link_libraries(${PROJECT_NAME}_node
+  ${PROJECT_NAME}
   ${catkin_LIBRARIES}
 )
 
@@ -75,7 +75,7 @@ target_link_libraries(iirob_led_node
 ## Install ##
 #############
 
-install(TARGETS iirob_led iirob_led_node
+install(TARGETS ${PROJECT_NAME} ${PROJECT_NAME}_node
   ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
   LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
   RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
