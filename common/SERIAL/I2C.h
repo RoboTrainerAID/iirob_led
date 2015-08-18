@@ -9,9 +9,9 @@
 #define HARDWARE_RANGER_I2C_H_
 
 
-namespace irob_hardware {
+namespace iirob_hardware {
 
-	class IROB_EXPORT I2C {
+	class IIROB_EXPORT I2C {
 	public:
 		static const unsigned char I2C_SGL = 0x53;
 		static const unsigned char I2C_MUL = 0x54;

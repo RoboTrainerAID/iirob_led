@@ -2,6 +2,7 @@
 #include "actionlib/server/simple_action_server.h"
 
 #include "iirob_led/PlayLedAction.h"
+#include "iirob_led/BlinkyAction.h"
 #include "iirob_led/SetLedDirectory.h"
 
 #include "std_msgs/String.h"
@@ -13,9 +14,9 @@ class LEDNode
 {
 public:
 	//! Constructor.
-	LEDNode(ros::NodeHandle nodeHandle) : m_numLeds(0), m_led(0), m_msec(1), as_(nodeHandle, "play_led", boost::bind(&LEDNode::playLed, this, _1), false)
+    LEDNode(ros::NodeHandle nodeHandle) : m_numLeds(0), m_led(0), m_msec(1), as_(nodeHandle, "blinky", boost::bind(&LEDNode::blinkyCallback, this, _1), false)
     {
-    };
+    }
 
 	//! Destructor.
 	~LEDNode(){
@@ -25,7 +26,7 @@ public:
 			m_led->setUniRGB(0, 0, 0);
 			delete m_led;
 		}
-	};
+    }
 
 	bool init(std::string const & port, int const & num);
 
@@ -100,7 +101,7 @@ public:
         return true;
     }
 
-	void playLed(const iirob_led::PlayLedGoalConstPtr& goal)
+    /*void playLed(const iirob_led::PlayLedGoalConstPtr& goal)
     {
         iirob_led::PlayLedFeedback feedback;
         iirob_led::PlayLedResult result;
@@ -186,27 +187,79 @@ public:
         m_led->setAllRGB(0, 0, 0, m_numLeds);
         result.real_duration = time_diff;
         as_.setSucceeded(result);
+    }*/
+
+    // Old name: lightActionCallback_2 with argument std_msgs::Float32MultiArray::ConstPtr&
+    // New name: Blinky
+    // Description: turns on and off selected LEDs
+    void blinkyCallback(const iirob_led::BlinkyGoal::ConstPtr& goal) {
+        iirob_led::BlinkyFeedback feedback;
+        iirob_led::BlinkyResult result;
+        int blinks_left;
+        int start_led = goal->start_led;
+        int end_led = goal->end_led;
+
+        if(start_led < 0)
+            start_led = 0;
+
+        if(end_led >= m_numLeds)
+            end_led = m_numLeds-1;
+
+        ROS_DEBUG("%s starting Blinky action with color [%f %f %f] [RGB]. Duration(ON): %f sec, Duration(OFF): %f, start led: %d, end led: %d",
+                 ros::this_node::getName().c_str(),
+                 goal->color.r, goal->color.g, goal->color.b, goal->duration_on, goal->duration_off, start_led, end_led);
+
+
+        for(int i = 0; i < goal->blinks; ++i)
+        {
+            // Set selected LEDs and turn them on
+            m_led->setRangeRGB(goal->color.r, goal->color.g, goal->color.b, m_numLeds, start_led, end_led);
+            ros::Duration(goal->duration_on).sleep();
+            // Set selected LEDs and turn them off
+            m_led->setRangeRGB(0, 0, 0, m_numLeds, goal->start_led, goal->end_led);
+            ros::Duration(goal->duration_off).sleep();
+
+            blinks_left--;
+            feedback.blinks_left = blinks_left;
+            ROS_DEBUG("%s: Blinky will blink %d more times", ros::this_node::getName().c_str(), feedback.blinks_left);
+            as_.publishFeedback(feedback);
+        }
+
+        m_led->setAllRGB(0, 0, 0, m_numLeds);
+        result.blinks_left = blinks_left;
+        as_.setSucceeded(result);
+
+        // Old
+        /*for(int j=0; j<(msg->data[0]); j++) {
+                m_led->setRangeRGBf(msg->data[5], msg->data[6], msg->data[7], m_numLeds, msg->data[3], msg->data[4]);
+                //~ for (int i=0; i<(msg->data[1]*100000000); i++);
+                ros::Duration(msg->data[1]).sleep();
+                m_led->setRangeRGBf(0, 0, 0, m_numLeds, msg->data[3], msg->data[4]);
+                //~ for (int i=0; i<(msg->data[2]*100000000); i++);
+                ros::Duration(msg->data[2]).sleep();
+        }*/
     }
+
 
 private:
     int m_msec;
     int m_numLeds;
-    irob_hardware::LEDStrip* m_led;
+    iirob_hardware::LEDStrip* m_led;
     int m_showDir;
 
-    actionlib::SimpleActionServer<iirob_led::PlayLedAction> as_;
+    actionlib::SimpleActionServer<iirob_led::BlinkyAction> as_;
 
 };
 
 bool LEDNode::init(std::string const & port, int const & num) {
 
-	m_led = new irob_hardware::LEDStrip(port);
+    m_led = new iirob_hardware::LEDStrip(port);
 	if (m_led->ready()) {
 		m_numLeds = num;
 		m_showDir = 4;
 
         as_.start();
-        ROS_INFO("%s: PlayLed action server started", ros::this_node::getName().c_str());
+        ROS_INFO("%s: IIROB-LED action server started", ros::this_node::getName().c_str());
 
 		return true;
 	}
@@ -235,12 +288,17 @@ int main(int argc, char **argv)
     LEDNode *ledNode = new LEDNode(nodeHandle);
     if (ledNode->init(port, num)) {
 
+        // Create subscribers for all the
         ros::Subscriber sub = nodeHandle.subscribe("led_command", 1000, &LEDNode::commandCallback, ledNode);
         ros::Subscriber sub3 = nodeHandle.subscribe("chosen_directory", 1000, &LEDNode::directoryCallback, ledNode);
         ros::Subscriber sub2 = nodeHandle.subscribe("led_color", 1000, &LEDNode::colorCallback, ledNode);
 
+        //ROS_INFO("Starting subscription for Blinky action");
+        //ros::Subscriber blinkySub = nodeHandle.subscribe("blinky", 1, &LEDNode::blinkyCallback, ledNode);
+
         ros::ServiceServer set_led_directory_srv = nodeHandle.advertiseService("set_led_directory", &LEDNode::set_led_directory, ledNode);
-        ROS_INFO("%s: Service for set motor rotational speed [rpm] started on: %s", ros::this_node::getName().c_str(), set_led_directory_srv.getService().c_str());
+        //ROS_INFO("%s: Service for set motor rotational speed [rpm] started on: %s", ros::this_node::getName().c_str(), set_led_directory_srv.getService().c_str()); // ?????????
+        ROS_INFO("%s: IIROB-LED directory set to %s", ros::this_node::getName().c_str(), set_led_directory_srv.getService().c_str());
 
         ros::spin();
 

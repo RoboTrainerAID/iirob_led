@@ -1,6 +1,7 @@
-std_msgs/ColorRGBA color     # RGB values [0-1]
+# TODO
 float32 duration    # in [s]
 float32 frequency   # in [Hz]
+std_msgs/ColorRGBA color     # RGB values [0-1]
 int32 start_led
 int32 end_led
 int32 directory_size

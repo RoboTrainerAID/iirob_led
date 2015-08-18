@@ -3,7 +3,7 @@
 
 #include <cstdio>
 
-using namespace irob_hardware;
+using namespace iirob_hardware;
 
 LEDModul::LEDModul(const std::string& port, bool printDebug)
 : printDebug(printDebug) {

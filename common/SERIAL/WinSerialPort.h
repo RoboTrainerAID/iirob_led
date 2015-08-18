@@ -7,7 +7,7 @@
 
 #pragma warning( disable : 4786 )  // Disable warning messages 4786
 
-class IROB_EXPORT WinSerialPort : public SerialPort {
+class IIROB_EXPORT WinSerialPort : public SerialPort {
 public:
 
   WinSerialPort(std::string device);

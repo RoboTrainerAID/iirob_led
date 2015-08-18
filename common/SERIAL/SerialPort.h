@@ -5,7 +5,7 @@
 #include <vector>
 
 
-class IROB_EXPORT SerialPort {
+class IIROB_EXPORT SerialPort {
 public:
 
   enum BaudRate {
@@ -35,7 +35,7 @@ public:
   };
 
 
-  class IROB_EXPORT Attributes {
+  class IIROB_EXPORT Attributes {
   public:
     BaudRate baudRate;
     FlowControl flowControl;

@@ -1,3 +1,22 @@
+# RUNNING (current state using irobLED and not this one here):
+# rosrun irobLED irobLED_node_strip
+# rostopic pub /iirob_led_node_stripe/light_action_7 std_msgs/Float32MultiArray "layout:
+#   dim:
+#   - label: ''
+#     size: 8
+#     stride: 0
+#   data_offset: 0
+# data:
+# - 10
+# - 5
+# - 0
+# - 200
+# - 250
+# - 1
+# - 0.5
+# - 0.5"
+#
+
 cmake_minimum_required(VERSION 2.8.3)
 project(iirob_led)
 
@@ -21,7 +40,13 @@ add_service_files(
 
 add_action_files(
   FILES
-  PlayLed.action
+  PlayLed.action            # ???
+  Blinky.action             # action 2
+  Police.action             # action 3
+  FourMusketeers.action     # action 4
+  RunningBunny.action       # action 5
+  Spinner.action            # action 6
+  Changeling.action         # action 7
 )
 
 generate_messages(
@@ -53,7 +78,7 @@ include_directories(
   ${catkin_INCLUDE_DIRS}
 )
 
-add_definitions( -DIROB_EXPORT= )
+add_definitions( -DIIROB_EXPORT= )
 
 ## Declare a cpp library
 add_library(${PROJECT_NAME}

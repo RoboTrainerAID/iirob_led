@@ -7,7 +7,7 @@
 #include "SerialPort.h"
 
 
-class IROB_EXPORT PosixSerialPort : public SerialPort {
+class IIROB_EXPORT PosixSerialPort : public SerialPort {
 public:
 
   PosixSerialPort(std::string device);

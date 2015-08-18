@@ -5,12 +5,12 @@
 #include "../SERIAL/I2C.h"
 
 
-namespace irob_hardware {
+namespace iirob_hardware {
 
 	class IROB_EXPORT LEDModul {
 	public:
 		static const unsigned char LED_BASE_ADDR = 0xC0;
-		static const unsigned char LED_READ  = LED_BASE_ADDR | I2C::I2C_READ;
+        static const unsigned char LED_READ  = LED_BASE_ADDR | I2C::I2C_READ;
 		static const unsigned char LED_WRITE = LED_BASE_ADDR | I2C::I2C_WRITE;
 		
 		/* registers */

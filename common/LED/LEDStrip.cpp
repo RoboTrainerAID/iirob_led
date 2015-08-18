@@ -6,7 +6,7 @@
 
 #define THREEWIRE
 
-using namespace irob_hardware;
+using namespace iirob_hardware;
 
 const unsigned char LEDStrip::led_lut[256] = {
 		0,   0,   0,   0,   0,   0,   0,   0,

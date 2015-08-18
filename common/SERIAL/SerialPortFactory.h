@@ -23,7 +23,7 @@
    @author Peter Heinze
    @date   15.12.2003
  */
-class  IROB_EXPORT CSerialPortFactory
+class IIROB_EXPORT CSerialPortFactory
 {
 public:
 
@@ -46,7 +46,7 @@ _TTY_LINUX_      Linux           /dev/ttyS0, /dev/ttyS1
 	  {
 
 	    if(sDevice.empty()){
-                #if defined(IROB_OS_LINUX) || defined(IROB_OS_IRIX)
+                #if defined(IIROB_OS_LINUX) || defined(IIROB_OS_IRIX)
    	          sDevice = "/dev/ttyS0";
                 #else
 	          sDevice = "COM1";
