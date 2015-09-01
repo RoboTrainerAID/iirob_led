@@ -13,7 +13,11 @@
 #include <std_msgs/String.h>
 #include <std_msgs/ColorRGBA.h>
 
-// OVERRIDE - set to true
+// TODO:
+/* - OVERRIDE - when ready set to false
+ * - Put subscribers inside LEDNode
+ * - Merge init with constructor and store result inside status (class member)
+ */
 
 #include "LEDStrip.h"
 
@@ -23,6 +27,14 @@ class LEDNode
     int m_numLeds;
     iirob_hardware::LEDStrip* m_led;
     int m_showDir;
+    bool light_flash_dir;
+    bool status;        // contains the return result from init()
+    std::string port;
+    int num;
+
+    ros::Subscriber subLedCommand;
+    ros::Subscriber subChosenDir;
+    ros::Subscriber subLedColor;
 
     actionlib::SimpleActionServer<iirob_led::BlinkyAction> blinkyAS;
     actionlib::SimpleActionServer<iirob_led::PoliceAction> policeAS;
@@ -32,8 +44,9 @@ class LEDNode
     actionlib::SimpleActionServer<iirob_led::SpinnerAction> spinnerAS;
 public:
 	//! Constructor.
-    LEDNode(ros::NodeHandle nodeHandle)
-        : m_msec(1),
+    LEDNode(ros::NodeHandle nodeHandle, std::string const& _port, int const& _num)
+        : m_led(0), m_numLeds(423), m_msec(1),
+          port(_port), num(_num),
           blinkyAS(nodeHandle, "blinky", boost::bind(&LEDNode::blinkyCallback, this, _1), false),
           policeAS(nodeHandle, "police", boost::bind(&LEDNode::policeCallback, this, _1), false),
           fourMusketeersAS(nodeHandle, "four_musketeers", boost::bind(&LEDNode::fourMusketeersCallback, this, _1), false),
@@ -41,6 +54,15 @@ public:
           changelingAS(nodeHandle, "changeling", boost::bind(&LEDNode::changelingCallback, this, _1), false),
           spinnerAS(nodeHandle, "spinner", boost::bind(&LEDNode::spinnerCallback, this, _1), false)
     {
+        light_flash_dir = true;
+        status = init(port, num);
+
+        if(status)
+        {
+            //subLedCommand = nh.subscribe("led_command", 10, &LEDNode::commandCallback, this);
+            //subChosenDir = nh.subscribe("chosen_directory", 10, &LEDNode::directoryCallback, this);
+            //subLedColor = nh.subscribe("led_color", 10, &LEDNode::colorCallback, this);
+        }
     }
 
 	//! Destructor.
@@ -61,6 +83,8 @@ public:
         changelingAS.shutdown();
         spinnerAS.shutdown();
     }
+
+    bool getStatus() { return status; }
 
     bool init(std::string const & port, int const & num) {
         m_led = new iirob_hardware::LEDStrip(port);
@@ -344,7 +368,89 @@ public:
     }
 
     void policeCallback(const iirob_led::PoliceGoal::ConstPtr& goal) {
+        iirob_led::PoliceFeedback feedback;
+        iirob_led::PoliceResult result;
+        int blinks_left = goal->blinks;
 
+        // LEFT_OUTER | LEFT_INNER | RIGHT_INNER | RIGHT_OUTER
+        int start_led_left_outer = goal->start_led_left_outer;
+        int end_led_left_outer = goal->end_led_left_outer;
+        int start_led_left_inner = goal->start_led_left_inner;
+        int end_led_left_inner = goal->end_led_left_inner;
+
+        int start_led_right_inner = goal->start_led_right_inner;
+        int end_led_right_inner = goal->end_led_right_inner;
+        int start_led_right_outer = goal->start_led_right_outer;
+        int end_led_right_outer = goal->end_led_right_outer;
+
+        // TODO: See a proper handling of out of range LEDs (more difficult then with Blinky since we have 4 sub-sections each with its own start and end
+        /*if(start_led < 0)
+            start_led = 0;
+
+        if(end_led >= m_numLeds)
+            end_led = m_numLeds-1;*/
+
+        ROS_INFO("Here comes the police!");
+
+        int i = 0;
+        for(; i < goal->blinks; ++i, --blinks_left)
+        {
+            m_led->setRangeRGBf(goal->color_left_outer.r, goal->color_left_outer.g, goal->color_left_outer.b, m_numLeds, start_led_left_outer, end_led_left_outer);
+            m_led->setRangeRGBf(goal->color_left_inner.r, goal->color_left_inner.g, goal->color_left_inner.b, m_numLeds, start_led_left_inner, end_led_left_inner);
+            ros::Duration(goal->duration_on).sleep();
+            m_led->setRangeRGBf(0, 0, 0, m_numLeds, start_led_left_outer, end_led_left_outer);
+            m_led->setRangeRGBf(0, 0, 0, m_numLeds, start_led_left_inner, end_led_left_inner);
+            ros::Duration(goal->duration_off).sleep();
+            m_led->setRangeRGBf(goal->color_right_inner.r, goal->color_right_inner.g, goal->color_right_inner.b, m_numLeds, start_led_right_inner, end_led_right_inner);
+            m_led->setRangeRGBf(goal->color_right_outer.r, goal->color_right_outer.g, goal->color_right_outer.b, m_numLeds, start_led_right_outer, end_led_right_outer);
+            ros::Duration(goal->duration_on).sleep();
+            m_led->setRangeRGBf(0, 0, 0, m_numLeds, start_led_right_inner, end_led_right_inner);
+            m_led->setRangeRGBf(0, 0, 0, m_numLeds, start_led_right_outer, end_led_right_outer);
+            ros::Duration(goal->duration_off).sleep();
+
+            feedback.blinks_left = blinks_left;
+            ROS_INFO("%s: Police will blink %d more times", ros::this_node::getName().c_str(), feedback.blinks_left);
+            policeAS.publishFeedback(feedback);
+        }
+
+        /*if(light_flash_dir)
+        {
+            for(; i < goal->blinks; ++i)
+            {
+                m_led->setRangeRGBf(goal->color_left_outer.r, goal->color_left_outer.g, goal->color_left_outer.b, m_numLeds, start_led_left_outer, end_led_left_outer);
+                m_led->setRangeRGBf(goal->color_left_inner.r, goal->color_left_inner.g, goal->color_left_inner.b, m_numLeds, start_led_left_inner, end_led_left_inner);
+                ros::Duration(goal->duration_on).sleep();
+                m_led->setRangeRGBf(0, 0, 0, m_numLeds, start_led_left_outer, end_led_left_outer);
+                m_led->setRangeRGBf(0, 0, 0, m_numLeds, start_led_left_inner, end_led_left_inner);
+                ros::Duration(goal->duration_off).sleep();
+
+                feedback.blinks_left = blinks_left;
+                ROS_INFO("%s: Police will blink %d more times", ros::this_node::getName().c_str(), feedback.blinks_left);
+                policeAS.publishFeedback(feedback);
+            }
+        }
+        else
+        {
+            for(; i < goal->blinks; ++i)
+            {
+                m_led->setRangeRGBf(goal->color_right_inner.r, goal->color_right_inner.g, goal->color_right_inner.b, m_numLeds, start_led_right_inner, end_led_right_inner);
+                m_led->setRangeRGBf(goal->color_right_outer.r, goal->color_right_outer.g, goal->color_right_outer.b, m_numLeds, start_led_right_outer, end_led_right_outer);
+                ros::Duration(goal->duration_on).sleep();
+                m_led->setRangeRGBf(0, 0, 0, m_numLeds, start_led_right_inner, end_led_right_inner);
+                m_led->setRangeRGBf(0, 0, 0, m_numLeds, start_led_right_outer, end_led_right_outer);
+                ros::Duration(goal->duration_off).sleep();
+            }
+        }*/
+
+        feedback.blinks_left = blinks_left;
+        ROS_INFO("%s: Police will blink %d more times", ros::this_node::getName().c_str(), feedback.blinks_left);
+
+        m_led->setAllRGBf(0, 0, 0, m_numLeds);
+        result.blinks_left = blinks_left;
+        policeAS.setSucceeded(result);
+
+        // Toggle blinking stripes
+        light_flash_dir = !light_flash_dir;
     }
 
     void fourMusketeersCallback(const iirob_led::FourMusketeersGoal::ConstPtr& goal) {
@@ -381,16 +487,18 @@ int main(int argc, char **argv)
     ROS_INFO("IIROB-LED node %s: Setting override to %s", ros::this_node::getName().c_str(), (override ? (char *)"on" : (char *)"off"));
 
     // If more then 8 LEDs are connected to the mC it will burn out
-    if ((!override) && (num>8)) num = 8;
+    if (!override && (num>8)) num = 8;
     ROS_INFO("IIROB-LED node %s: Setting number of LEDs to %d", ros::this_node::getName().c_str(), num);
 
     ROS_INFO("IIROB-LED node %s: Initializing ledNode on port %s with %d LEDs.", ros::this_node::getName().c_str(), port.c_str(), num);
-    LEDNode *ledNode = new LEDNode(nh);
+//    LEDNode *ledNode = new LEDNode(nh);
+    LEDNode *ledNode = new LEDNode(nh, port, num);
 
     // move all that is below to LEDNode
-    if (ledNode->init(port, num)) {
+    //if (ledNode->init(port, num)) {
+    if (ledNode->getStatus()) {
 
-        // Create subscribers for all the
+        // MOVE THOSE TO CONSTRUCTOR OF LEDNODE
         ros::Subscriber sub = nh.subscribe("led_command", 10, &LEDNode::commandCallback, ledNode);
         ros::Subscriber sub3 = nh.subscribe("chosen_directory", 10, &LEDNode::directoryCallback, ledNode);
         ros::Subscriber sub2 = nh.subscribe("led_color", 10, &LEDNode::colorCallback, ledNode);

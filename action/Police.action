@@ -1,12 +1,29 @@
-# TODO
-std_msgs/ColorRGBA color    # RGB values [0-1] for all LEDs
-int32  blinkNumber          # Number of flashes (1 flash = 1 time on + 1 time off)
-float32 durationOn          # in [s]
-float32 durationOff         # in [s]
-int32 start_led
-int32 end_led
-# TODO - encrypt what Ruben is doing
+int32  blinks                   # Number of flashes (1 flash = 1 time on + 1 time off)
+float32 duration_on             # in [s]
+float32 duration_off            # in [s]
+#######################################################
+# left_outer | left_inner | right_inner | right_outer #
+#######################################################
+# start_..._outer    first LED in the selected stripe where LEDs will blink
+# end_..._inner      last LED in the selected stripe where LEDs will blink
+# color_..._inner
+# color_..._outer    RGB values [0-1] for all LEDs in the selected stripe
+int32 start_led_left_outer
+int32 end_led_left_outer
+std_msgs/ColorRGBA color_left_outer
+
+int32 start_led_left_inner
+int32 end_led_left_inner
+std_msgs/ColorRGBA color_left_inner
+
+int32 start_led_right_outer
+int32 end_led_right_outer
+std_msgs/ColorRGBA color_right_outer
+
+int32 start_led_right_inner
+int32 end_led_right_inner
+std_msgs/ColorRGBA color_right_inner
 ---
-float32 real_duration # in [s]
+int32 blinks_left               # Result (if == 0 then really successful)
 ---
-float32 until_end   # in [s]
+int32 blinks_left               # Feedback: number of blinks left until the goal is completed
