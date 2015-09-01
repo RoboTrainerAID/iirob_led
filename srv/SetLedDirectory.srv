@@ -1,0 +1,4 @@
+std_msgs/ColorRGBA color     # RGB values [0-1]
+int32 start_led
+int32 end_led
+---

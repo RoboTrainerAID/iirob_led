@@ -1,0 +1,13 @@
+<?xml version="1.0"?>
+<launch>
+
+    <!-- Subscription topic from the iirob action server node -->
+    <arg name="as_node" value="leds" />
+    <arg name="as_server" value="$(arg as_node)/blinky" />
+
+    <node name="leds_client" pkg="iirob_led" type="iirob_led_node_client_test" output="screen">
+        <param name="as" value="$(arg as_server)" type="string"/>
+<!--        <param name="as" value="/leds/blinky" type="string"/> -->
+    </node>
+
+</launch>
