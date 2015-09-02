@@ -1,29 +1,34 @@
-int32  blinks                   # Number of flashes (1 flash = 1 time on + 1 time off)
-float32 duration_on             # in [s]
-float32 duration_off            # in [s]
+int32 blinks                    # Number of flashes (1 flash = 1 time on + 1 time off) - duration: long
+int32 fast_blinks               # Number of flashes (1 flash = 1 time on + 1 time off) - duration: short (takes place from one long flash to another)
+
+# TODO: put fast_duration_on and off inside a single parameter that is simply split in 2 (similar to the LED stripe) and the information about on/off duration is extracted from there
+float32 fast_duration_on        # These two parameters determine how fast the flashes with short duration are
+float32 fast_duration_off       # in [s] or [ms]
+float32 pause_between_long_blinks # pause between each set of fast flashes; in [s] or [ms]
+
 #######################################################
+# The given stripe (start to end) is always devided   #
+# in two equal halves. The size of each inner stripe  #
+# is determined by the inner_size_ratio               #
+#                                                     #
+# start-------------------------------------------end #
 # left_outer | left_inner | right_inner | right_outer #
 #######################################################
-# start_..._outer    first LED in the selected stripe where LEDs will blink
-# end_..._inner      last LED in the selected stripe where LEDs will blink
-# color_..._inner
+# color_..._inner    RGB values [0-1] for all LEDs in the selected stripe
 # color_..._outer    RGB values [0-1] for all LEDs in the selected stripe
-int32 start_led_left_outer
-int32 end_led_left_outer
+
+# Following two parameters determine the total size of the stripe, which is subdivided in smaller subsections
+int32 start_led
+int32 end_led
+
 std_msgs/ColorRGBA color_left_outer
-
-int32 start_led_left_inner
-int32 end_led_left_inner
 std_msgs/ColorRGBA color_left_inner
-
-int32 start_led_right_outer
-int32 end_led_right_outer
+std_msgs/ColorRGBA color_right_inner
 std_msgs/ColorRGBA color_right_outer
 
-int32 start_led_right_inner
-int32 end_led_right_inner
-std_msgs/ColorRGBA color_right_inner
+int32 num_inner_leds            # Number of LEDs for EACH inner stripe; it can be <= the half of all LEDs defined by start_led and end_led
 ---
-int32 blinks_left               # Result (if == 0 then really successful)
+int32 blinks_left               # Result (if == 0 then really successful); refers to the flashes with LONG duration only
 ---
-int32 blinks_left               # Feedback: number of blinks left until the goal is completed
+int32 fast_blinks_left          # Feedback: number of flashes left until the next flash with long duration
+int32 blinks_left               # Feedback: number of flashes left until the goal is completed; refers to the flashes with LONG duration only

@@ -27,7 +27,6 @@ class LEDNode
     int m_numLeds;
     iirob_hardware::LEDStrip* m_led;
     int m_showDir;
-    bool light_flash_dir;
     bool status;        // contains the return result from init()
     std::string port;
     int num;
@@ -54,7 +53,6 @@ public:
           changelingAS(nodeHandle, "changeling", boost::bind(&LEDNode::changelingCallback, this, _1), false),
           spinnerAS(nodeHandle, "spinner", boost::bind(&LEDNode::spinnerCallback, this, _1), false)
     {
-        light_flash_dir = true;
         status = init(port, num);
 
         if(status)
@@ -316,7 +314,6 @@ public:
     // New name: Blinky
     // Description: turns on and off selected LEDs
     void blinkyCallback(const iirob_led::BlinkyGoal::ConstPtr& goal) {
-        ROS_INFO("BLINKY CALLBACK HERE!");
         iirob_led::BlinkyFeedback feedback;
         iirob_led::BlinkyResult result;
         int blinks_left = goal->blinks;
@@ -355,102 +352,111 @@ public:
         m_led->setAllRGBf(0, 0, 0, m_numLeds);
         result.blinks_left = blinks_left;
         blinkyAS.setSucceeded(result);
-
-        // Old
-        /*for(int j=0; j<(msg->data[0]); j++) {
-                m_led->setRangeRGBf(msg->data[5], msg->data[6], msg->data[7], m_numLeds, msg->data[3], msg->data[4]);
-                //~ for (int i=0; i<(msg->data[1]*100000000); i++);
-                ros::Duration(msg->data[1]).sleep();
-                m_led->setRangeRGBf(0, 0, 0, m_numLeds, msg->data[3], msg->data[4]);
-                //~ for (int i=0; i<(msg->data[2]*100000000); i++);
-                ros::Duration(msg->data[2]).sleep();
-        }*/
     }
 
+    // TODO:
     void policeCallback(const iirob_led::PoliceGoal::ConstPtr& goal) {
+        ROS_INFO("POLICE CALLBACK HERE!");
         iirob_led::PoliceFeedback feedback;
         iirob_led::PoliceResult result;
         int blinks_left = goal->blinks;
+        int fast_blinks_left = goal->fast_blinks;
+        int start_led = goal->start_led;
+        int end_led = goal->end_led;
+        int num_inner_leds = goal->num_inner_leds;
 
-        // LEFT_OUTER | LEFT_INNER | RIGHT_INNER | RIGHT_OUTER
-        int start_led_left_outer = goal->start_led_left_outer;
-        int end_led_left_outer = goal->end_led_left_outer;
-        int start_led_left_inner = goal->start_led_left_inner;
-        int end_led_left_inner = goal->end_led_left_inner;
+        if(start_led < 0) start_led = 0;
+        if(end_led >= m_numLeds) end_led = m_numLeds-1;
+        int totLength = (end_led - start_led);
+        ROS_INFO("SETUP COMPLETED");
 
-        int start_led_right_inner = goal->start_led_right_inner;
-        int end_led_right_inner = goal->end_led_right_inner;
-        int start_led_right_outer = goal->start_led_right_outer;
-        int end_led_right_outer = goal->end_led_right_outer;
-
-        // TODO: See a proper handling of out of range LEDs (more difficult then with Blinky since we have 4 sub-sections each with its own start and end
-        /*if(start_led < 0)
-            start_led = 0;
-
-        if(end_led >= m_numLeds)
-            end_led = m_numLeds-1;*/
-
-        ROS_INFO("Here comes the police!");
-
-        int i = 0;
-        for(; i < goal->blinks; ++i, --blinks_left)
+        // Check if size of each inner stripe is equal or greater then the number of LEDs dedicated for half of the full stripe
+        // In case this is true we convert the PoliceGoal into a BlinkyGoal since there is no difference between those in this scenario
+        if((num_inner_leds >= (int)totLength/2) || (num_inner_leds <= 0)) // maybe floor or ceil here are better suited here; also using uint here would release us from the burden of checking for values < 0
         {
-            m_led->setRangeRGBf(goal->color_left_outer.r, goal->color_left_outer.g, goal->color_left_outer.b, m_numLeds, start_led_left_outer, end_led_left_outer);
-            m_led->setRangeRGBf(goal->color_left_inner.r, goal->color_left_inner.g, goal->color_left_inner.b, m_numLeds, start_led_left_inner, end_led_left_inner);
-            ros::Duration(goal->duration_on).sleep();
-            m_led->setRangeRGBf(0, 0, 0, m_numLeds, start_led_left_outer, end_led_left_outer);
-            m_led->setRangeRGBf(0, 0, 0, m_numLeds, start_led_left_inner, end_led_left_inner);
-            ros::Duration(goal->duration_off).sleep();
-            m_led->setRangeRGBf(goal->color_right_inner.r, goal->color_right_inner.g, goal->color_right_inner.b, m_numLeds, start_led_right_inner, end_led_right_inner);
-            m_led->setRangeRGBf(goal->color_right_outer.r, goal->color_right_outer.g, goal->color_right_outer.b, m_numLeds, start_led_right_outer, end_led_right_outer);
-            ros::Duration(goal->duration_on).sleep();
-            m_led->setRangeRGBf(0, 0, 0, m_numLeds, start_led_right_inner, end_led_right_inner);
-            m_led->setRangeRGBf(0, 0, 0, m_numLeds, start_led_right_outer, end_led_right_outer);
-            ros::Duration(goal->duration_off).sleep();
+            iirob_led::BlinkyGoal propagated_goal;
+            propagated_goal.blinks = blinks_left;
+            propagated_goal.color = goal->color_left_outer;         // We use only one of the 4 given colours for Blinky
+            propagated_goal.duration_on = goal->fast_duration_on;   // We use the on/off durations for the fast blinks only
+            propagated_goal.duration_off = goal->fast_duration_off;
+            propagated_goal.start_led = start_led;
+            propagated_goal.end_led = end_led;
+            //iirob_led::BlinkyGoal::ConstPtr g = &propagated_goal;
+            //this->blinkyCallback(g);
 
-            feedback.blinks_left = blinks_left;
-            ROS_INFO("%s: Police will blink %d more times", ros::this_node::getName().c_str(), feedback.blinks_left);
-            policeAS.publishFeedback(feedback);
+            // Figure out a proper propagation mechanism. Even if we convert the PoliceGoal to BlinkyGoal the feedback and result still have to be for the Police action!
+            // ...
+
+            // Else we can rewrite Blinky here to handle this case
+
+            return;
         }
 
-        /*if(light_flash_dir)
-        {
-            for(; i < goal->blinks; ++i)
-            {
-                m_led->setRangeRGBf(goal->color_left_outer.r, goal->color_left_outer.g, goal->color_left_outer.b, m_numLeds, start_led_left_outer, end_led_left_outer);
-                m_led->setRangeRGBf(goal->color_left_inner.r, goal->color_left_inner.g, goal->color_left_inner.b, m_numLeds, start_led_left_inner, end_led_left_inner);
-                ros::Duration(goal->duration_on).sleep();
-                m_led->setRangeRGBf(0, 0, 0, m_numLeds, start_led_left_outer, end_led_left_outer);
-                m_led->setRangeRGBf(0, 0, 0, m_numLeds, start_led_left_inner, end_led_left_inner);
-                ros::Duration(goal->duration_off).sleep();
+        // Probably this here needs some rework
+        int start_led_left_outer = start_led;
+        int end_led_left_outer = start_led + ((int)totLength/2 - num_inner_leds);
 
+        int start_led_left_inner = end_led_left_outer;
+        int end_led_left_inner = start_led + (int)totLength/2;
+
+        int start_led_right_inner = end_led_left_inner + 1;
+        int end_led_right_inner = start_led_right_inner + num_inner_leds - 1;
+
+        int start_led_right_outer = end_led_right_inner;
+        int end_led_right_outer = end_led;
+
+        ROS_INFO("start_led_left_outer: %d", start_led_left_outer);
+        ROS_INFO("end_led_left_outer: %d", end_led_left_outer);
+
+        ROS_INFO("start_led_left_inner: %d", start_led_left_inner);
+        ROS_INFO("end_led_left_inner: %d", end_led_left_inner);
+
+        ROS_INFO("start_led_right_inner: %d", start_led_right_inner);
+        ROS_INFO("end_led_right_inner: %d", end_led_right_inner);
+
+        ROS_INFO("start_led_right_outer: %d", start_led_right_outer);
+        ROS_INFO("end_led_right_outer: %d", end_led_right_outer);
+
+
+        int j;
+        for(int i = 0; i < goal->blinks; ++i, --blinks_left)
+        {
+            ROS_INFO(" -- Long blinks left: %d", blinks_left);
+            for(j = 0; j < goal->fast_blinks; ++j, --fast_blinks_left)
+            {
+                ROS_INFO(" -- Short blinks left: %d", fast_blinks_left);
+                // Blink the outer subsections
+                m_led->setRangeRGBf(goal->color_left_outer.r, goal->color_left_outer.g, goal->color_left_outer.b, m_numLeds, start_led_left_outer, end_led_left_outer);
+                m_led->setRangeRGBf(goal->color_right_outer.r, goal->color_right_outer.g, goal->color_right_outer.b, m_numLeds, start_led_right_outer, end_led_right_outer);
+                ros::Duration(goal->fast_duration_on).sleep();
+
+                m_led->setRangeRGBf(0, 0, 0, m_numLeds, start_led_left_outer, end_led_left_outer);
+                m_led->setRangeRGBf(0, 0, 0, m_numLeds, start_led_right_outer, end_led_right_outer);
+                ros::Duration(goal->fast_duration_off).sleep();
+
+                // Blink the inner subsections
+                m_led->setRangeRGBf(goal->color_left_inner.r, goal->color_left_inner.g, goal->color_left_inner.b, m_numLeds, start_led_left_inner, end_led_left_inner);
+                m_led->setRangeRGBf(goal->color_right_inner.r, goal->color_right_inner.g, goal->color_right_inner.b, m_numLeds, start_led_right_inner, end_led_right_inner);
+                ros::Duration(goal->fast_duration_on).sleep();
+
+                m_led->setRangeRGBf(0, 0, 0, m_numLeds, start_led_left_inner, end_led_left_inner);
+                m_led->setRangeRGBf(0, 0, 0, m_numLeds, start_led_right_inner, end_led_right_inner);
+                ros::Duration(goal->fast_duration_off).sleep();
+
+                // Send feedback
+                feedback.fast_blinks_left = fast_blinks_left;
                 feedback.blinks_left = blinks_left;
-                ROS_INFO("%s: Police will blink %d more times", ros::this_node::getName().c_str(), feedback.blinks_left);
                 policeAS.publishFeedback(feedback);
             }
-        }
-        else
-        {
-            for(; i < goal->blinks; ++i)
-            {
-                m_led->setRangeRGBf(goal->color_right_inner.r, goal->color_right_inner.g, goal->color_right_inner.b, m_numLeds, start_led_right_inner, end_led_right_inner);
-                m_led->setRangeRGBf(goal->color_right_outer.r, goal->color_right_outer.g, goal->color_right_outer.b, m_numLeds, start_led_right_outer, end_led_right_outer);
-                ros::Duration(goal->duration_on).sleep();
-                m_led->setRangeRGBf(0, 0, 0, m_numLeds, start_led_right_inner, end_led_right_inner);
-                m_led->setRangeRGBf(0, 0, 0, m_numLeds, start_led_right_outer, end_led_right_outer);
-                ros::Duration(goal->duration_off).sleep();
-            }
-        }*/
 
-        feedback.blinks_left = blinks_left;
-        ROS_INFO("%s: Police will blink %d more times", ros::this_node::getName().c_str(), feedback.blinks_left);
+            // Make a pause before the next set of fast blinks
+            ros::Duration(goal->pause_between_long_blinks).sleep();
+            fast_blinks_left = goal->fast_blinks;
+        }
 
         m_led->setAllRGBf(0, 0, 0, m_numLeds);
         result.blinks_left = blinks_left;
         policeAS.setSucceeded(result);
-
-        // Toggle blinking stripes
-        light_flash_dir = !light_flash_dir;
     }
 
     void fourMusketeersCallback(const iirob_led::FourMusketeersGoal::ConstPtr& goal) {
