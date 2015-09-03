@@ -13,11 +13,9 @@
 #include <std_msgs/String.h>
 #include <std_msgs/ColorRGBA.h>
 
-// TODO:
-/* - OVERRIDE - when ready set to false
- * - Put subscribers inside LEDNode
- * - Merge init with constructor and store result inside status (class member)
- */
+// TODO: OVERRIDE - when ready set to false
+// TODO: Put subscribers inside LEDNode
+// TODO: Merge init with constructor and store result inside status (class member)
 
 #include "LEDStrip.h"
 
@@ -354,9 +352,8 @@ public:
         blinkyAS.setSucceeded(result);
     }
 
-    // TODO:
+    // TODO: Change Police action message
     void policeCallback(const iirob_led::PoliceGoal::ConstPtr& goal) {
-        ROS_INFO("POLICE CALLBACK HERE!");
         iirob_led::PoliceFeedback feedback;
         iirob_led::PoliceResult result;
         int blinks_left = goal->blinks;
@@ -372,11 +369,11 @@ public:
 
         // Check if size of each inner stripe is equal or greater then the number of LEDs dedicated for half of the full stripe
         // In case this is true we convert the PoliceGoal into a BlinkyGoal since there is no difference between those in this scenario
-        if((num_inner_leds >= (int)totLength/2) || (num_inner_leds <= 0)) // maybe floor or ceil here are better suited here; also using uint here would release us from the burden of checking for values < 0
+        /*if((num_inner_leds >= (int)totLength/2) || (num_inner_leds <= 0)) // maybe floor or ceil here are better suited here; also using uint here would release us from the burden of checking for values < 0
         {
             iirob_led::BlinkyGoal propagated_goal;
             propagated_goal.blinks = blinks_left;
-            propagated_goal.color = goal->color_left_outer;         // We use only one of the 4 given colours for Blinky
+            propagated_goal.color = goal->color_outer;         // We use only one of the 4 given colours for Blinky
             propagated_goal.duration_on = goal->fast_duration_on;   // We use the on/off durations for the fast blinks only
             propagated_goal.duration_off = goal->fast_duration_off;
             propagated_goal.start_led = start_led;
@@ -390,7 +387,7 @@ public:
             // Else we can rewrite Blinky here to handle this case
 
             return;
-        }
+        }*/
 
         // Probably this here needs some rework
         int start_led_left_outer = start_led;
@@ -426,8 +423,8 @@ public:
             {
                 ROS_INFO(" -- Short blinks left: %d", fast_blinks_left);
                 // Blink the outer subsections
-                m_led->setRangeRGBf(goal->color_left_outer.r, goal->color_left_outer.g, goal->color_left_outer.b, m_numLeds, start_led_left_outer, end_led_left_outer);
-                m_led->setRangeRGBf(goal->color_right_outer.r, goal->color_right_outer.g, goal->color_right_outer.b, m_numLeds, start_led_right_outer, end_led_right_outer);
+                m_led->setRangeRGBf(goal->color_outer.r, goal->color_outer.g, goal->color_outer.b, m_numLeds, start_led_left_outer, end_led_left_outer);
+                m_led->setRangeRGBf(goal->color_outer.r, goal->color_outer.g, goal->color_outer.b, m_numLeds, start_led_right_outer, end_led_right_outer);
                 ros::Duration(goal->fast_duration_on).sleep();
 
                 m_led->setRangeRGBf(0, 0, 0, m_numLeds, start_led_left_outer, end_led_left_outer);
@@ -435,8 +432,8 @@ public:
                 ros::Duration(goal->fast_duration_off).sleep();
 
                 // Blink the inner subsections
-                m_led->setRangeRGBf(goal->color_left_inner.r, goal->color_left_inner.g, goal->color_left_inner.b, m_numLeds, start_led_left_inner, end_led_left_inner);
-                m_led->setRangeRGBf(goal->color_right_inner.r, goal->color_right_inner.g, goal->color_right_inner.b, m_numLeds, start_led_right_inner, end_led_right_inner);
+                m_led->setRangeRGBf(goal->color_inner.r, goal->color_inner.g, goal->color_inner.b, m_numLeds, start_led_left_inner, end_led_left_inner);
+                m_led->setRangeRGBf(goal->color_inner.r, goal->color_inner.g, goal->color_inner.b, m_numLeds, start_led_right_inner, end_led_right_inner);
                 ros::Duration(goal->fast_duration_on).sleep();
 
                 m_led->setRangeRGBf(0, 0, 0, m_numLeds, start_led_left_inner, end_led_left_inner);
@@ -464,7 +461,65 @@ public:
     }
 
     void runningBunnyCallback(const iirob_led::RunningBunnyGoal::ConstPtr& goal) {
+        // TODO Use modulo to create a neat transition between previous and next circle!
+        // TODO Change RGB values logarithmic
+        ROS_INFO("RUNNING BUNNY CALLBACK");
+        iirob_led::RunningBunnyFeedback feedback;
+        iirob_led::RunningBunnyResult result;
+        int circle_counter = goal->num_circles;
+        int head = goal->head;
+        int body = goal->body;
+        int jumpOver = goal->skip_leds_per_step;
 
+        if(!head) head = 1;
+        if(!body) body = 1;
+        if(jumpOver <= 0) jumpOver = (int)body/2;
+
+        int j;
+        for(int i = 0; i < circle_counter; ++i)
+        {
+            ROS_INFO("Circle: %d", i);
+            int _head = head % m_numLeds;
+            int tail = (head - body) % m_numLeds;
+            int tail_old = tail;
+            for(j = _head; j < m_numLeds; j+=jumpOver)
+            {
+                //if(body < 0) continue;
+                //if(head >= m_numLeds) break;
+
+                ROS_INFO("Current head position: %d", _head);
+                ROS_INFO("Current body position: %d", tail);
+                ROS_INFO("Current old body position: %d", tail_old);
+
+                if(_head > tail)
+                    m_led->setRangeRGBf(goal->color.r, goal->color.g, goal->color.b, m_numLeds, tail, _head);
+                else if(_head < tail)
+                    m_led->setRangeRGBf(goal->color.r, goal->color.g, goal->color.b, m_numLeds, tail, _head);
+
+                // THIS IS USED CURRENTLY
+                //m_led->setRangeRGBf(0, 0, 0, m_numLeds, tail, _head);
+
+                // If following is used it gradually fills all LEDs, turns them off at the end and cycle repeats
+                // m_led->setRangeRGBf(0, 0, 0, m_numLeds, _head, _body);
+
+                feedback.current_head_pos = _head;
+                runningBunnyAS.publishFeedback(feedback);
+
+                tail = (tail + jumpOver) % m_numLeds;
+                _head = (_head + jumpOver) % m_numLeds;
+
+                // Turn off the trail from the bunny - the distance between the old tail and the new one; this allows a much smoother transition without blinking the whole bunny
+                m_led->setRangeRGBf(0, 0, 0, m_numLeds, tail-tail_old, tail);
+
+                tail_old = tail;
+            }
+
+            m_led->setAllRGBf(0, 0, 0, m_numLeds);
+        }
+
+        //m_led->setAllRGBf(0, 0, 0, m_numLeds);
+        result.current_head_pos = head;
+        runningBunnyAS.setSucceeded(result);
     }
 
     void changelingCallback(const iirob_led::ChangelingGoal::ConstPtr& goal) {

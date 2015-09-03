@@ -3,7 +3,7 @@ int32 fast_blinks               # Number of flashes (1 flash = 1 time on + 1 tim
 
 # TODO: put fast_duration_on and off inside a single parameter that is simply split in 2 (similar to the LED stripe) and the information about on/off duration is extracted from there
 float32 fast_duration_on        # These two parameters determine how fast the flashes with short duration are
-float32 fast_duration_off       # in [s] or [ms]
+float32 fast_duration_off       # in [s] (use 0.0x as values since it looks more like fast flashing)
 float32 pause_between_long_blinks # pause between each set of fast flashes; in [s] or [ms]
 
 #######################################################
@@ -14,17 +14,12 @@ float32 pause_between_long_blinks # pause between each set of fast flashes; in [
 # start-------------------------------------------end #
 # left_outer | left_inner | right_inner | right_outer #
 #######################################################
-# color_..._inner    RGB values [0-1] for all LEDs in the selected stripe
-# color_..._outer    RGB values [0-1] for all LEDs in the selected stripe
-
-# Following two parameters determine the total size of the stripe, which is subdivided in smaller subsections
+# Following two parameters determine the total size of the stripe, which is subdivided in smaller subsections (see comment above)
 int32 start_led
 int32 end_led
 
-std_msgs/ColorRGBA color_left_outer
-std_msgs/ColorRGBA color_left_inner
-std_msgs/ColorRGBA color_right_inner
-std_msgs/ColorRGBA color_right_outer
+std_msgs/ColorRGBA color_outer
+std_msgs/ColorRGBA color_inner
 
 int32 num_inner_leds            # Number of LEDs for EACH inner stripe; it can be <= the half of all LEDs defined by start_led and end_led
 ---

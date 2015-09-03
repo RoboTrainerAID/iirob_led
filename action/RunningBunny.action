@@ -1,11 +1,14 @@
-# TODO
-float32 duration    # in [s]
-float32 frequency   # in [Hz]
-std_msgs/ColorRGBA color     # RGB values [0-1]
-int32 start_led
-int32 end_led
-int32 directory_size
+# WARNING: this is not lightActionCallback_6
+std_msgs/ColorRGBA color    # RGB values [0-1] for all LEDs
+############################################
+#        <---running direction----         #
+# Bunny: [head][][][][]...[][tail]         #
+############################################
+int32 head                  # Head of the bunny - starting LED for the strip that represents the bunny
+int32 body                  # Body of the bunny - size of the strip that represents the bunny
+int32 num_circles           # Number of blinks (1 blink = 1 time on + 1 time off)
+int32 skip_leds_per_step    # Number of LEDs to jump over (basically this determines how fast the bunny runs)
 ---
-float32 real_duration # in [s]
+int32 current_head_pos           # Number of blinks left until the goal is completed (change this to some decent feedback)
 ---
-float32 until_end   # in [s]
+int32 current_head_pos           # Number of blinks left until the goal is completed
