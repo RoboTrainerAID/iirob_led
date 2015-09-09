@@ -1,11 +1,13 @@
-# TODO
-float32 duration    # in [s]
-float32 frequency   # in [Hz]
-std_msgs/ColorRGBA color     # RGB values [0-1]
-int32 start_led
-int32 end_led
-int32 directory_size
+std_msgs/ColorRGBA color1    # RGB values [0-1] for Athos
+std_msgs/ColorRGBA color2    # RGB values [0-1] for Porthos
+std_msgs/ColorRGBA color3    # RGB values [0-1] for Aramis
+std_msgs/ColorRGBA color4    # RGB values [0-1] for D'Artagnan
+int32  blinks               # Number of blinks (1 blink = 1 time on + 1 time off)
+float32 duration_on          # in [s]
+float32 duration_off         # in [s]
+int32 start_led             # First LED in the stripe where LEDs will blink
+int32 end_led               # Last LED in the stripe where LEDs will blink
 ---
-float32 real_duration # in [s]
+int32 blinks_left           # Number of blinks left until the goal is completed (change this to some decent feedback)
 ---
-float32 until_end   # in [s]
+int32 blinks_left           # Number of blinks left until the goal is completed

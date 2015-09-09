@@ -42,6 +42,7 @@ catkin_package(
 include_directories(
   common/LED
   common/SERIAL
+  common/RGBCONVERTER
   ${catkin_INCLUDE_DIRS}
 )
 
@@ -59,10 +60,13 @@ add_library(${PROJECT_NAME}
   common/SERIAL/SerialPortFactory.cpp
 )
 
+add_library(rgbconverter common/RGBCONVERTER/RGBConverter.cpp)
+
 add_executable(${PROJECT_NAME}_node src/iirob_led_node.cpp)
 add_dependencies(${PROJECT_NAME}_node ${PROJECT_NAME}_generate_messages_cpp)
 target_link_libraries(${PROJECT_NAME}_node
   ${PROJECT_NAME}
+  #rgbconverter
   ${catkin_LIBRARIES}
 )
 
@@ -70,6 +74,7 @@ add_executable(${PROJECT_NAME}_node_client_test src/iirob_led_node_client_test.c
 add_dependencies(${PROJECT_NAME}_node_client_test ${PROJECT_NAME}_generate_messages_cpp)
 target_link_libraries(${PROJECT_NAME}_node_client_test
   ${PROJECT_NAME}
+  rgbconverter
   ${catkin_LIBRARIES}
 )
 

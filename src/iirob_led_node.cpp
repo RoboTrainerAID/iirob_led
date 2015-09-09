@@ -13,6 +13,8 @@
 #include <std_msgs/String.h>
 #include <std_msgs/ColorRGBA.h>
 
+#include <cmath>
+
 // TODO: OVERRIDE - when ready set to false
 // TODO: Put subscribers inside LEDNode
 // TODO: Merge init with constructor and store result inside status (class member)
@@ -39,6 +41,7 @@ class LEDNode
     actionlib::SimpleActionServer<iirob_led::RunningBunnyAction> runningBunnyAS;
     actionlib::SimpleActionServer<iirob_led::ChangelingAction> changelingAS;
     actionlib::SimpleActionServer<iirob_led::SpinnerAction> spinnerAS;
+
 public:
 	//! Constructor.
     LEDNode(ros::NodeHandle nodeHandle, std::string const& _port, int const& _num)
@@ -318,17 +321,12 @@ public:
         int start_led = goal->start_led;
         int end_led = goal->end_led;
 
-        if(start_led < 0)
-            start_led = 0;
-
-        if(end_led >= m_numLeds)
-            end_led = m_numLeds-1;
+        if(start_led < 0) start_led = 0;
+        if(end_led >= m_numLeds) end_led = m_numLeds-1;
 
         ROS_DEBUG("%s starting Blinky action with color [%f %f %f] [RGB]. Duration(ON): %f sec, Duration(OFF): %f, start led: %d, end led: %d",
                  ros::this_node::getName().c_str(),
                  goal->color.r, goal->color.g, goal->color.b, goal->duration_on, goal->duration_off, start_led, end_led);
-
-        // POST VS PREINCREMENT
 
         for(int i = 0; i < goal->blinks; ++i, --blinks_left)
         {
@@ -396,7 +394,7 @@ public:
         int start_led_left_inner = end_led_left_outer;
         int end_led_left_inner = start_led + (int)totLength/2;
 
-        int start_led_right_inner = end_led_left_inner + 1;
+        int start_led_right_inner = end_led_left_inner;
         int end_led_right_inner = start_led_right_inner + num_inner_leds - 1;
 
         int start_led_right_outer = end_led_right_inner;
@@ -457,7 +455,72 @@ public:
     }
 
     void fourMusketeersCallback(const iirob_led::FourMusketeersGoal::ConstPtr& goal) {
+        iirob_led::FourMusketeersFeedback feedback;
+        iirob_led::FourMusketeersResult result;
+        int blinks_left = goal->blinks;
+        int start_led = goal->start_led;
+        int end_led = goal->end_led;
 
+        if(start_led < 0) start_led = 0;
+        if(end_led >= m_numLeds) end_led = m_numLeds-1;
+
+        if(end_led - start_led < 3) {
+            start_led = 0;
+            end_led = m_numLeds-1;
+        }
+
+        // Split the given interval of LEDs into 4 more or less equal subsections each with its own coloring
+        int half = (end_led - start_led)/2;
+        int start_ledAthos = start_led;
+        int end_ledAthos = start_ledAthos + half/2;
+
+        int start_ledPorthos = end_ledAthos;
+        int end_ledPorthos = start_ledPorthos + half/2;
+
+        int start_ledAramis = end_ledPorthos;
+        int end_ledAramis = start_ledAramis + half/2;
+
+        int start_ledDArtagnan = end_ledAramis;
+        int end_ledDArtagnan = end_led;
+
+        ROS_INFO("%s starting Four Musketeers action with duration(ON): %.2f sec and duration(OFF): %.2f\n\n\t Athos\t\tstart led: %d, end led: %d\tcolor: %.2f %.2f %.2f \n\t Porthos\tstart led: %d, end led: %d\tcolor: %.2f %.2f %.2f \n\t Aramis\t\tstart led: %d, end led: %d\tcolor: %.2f %.2f %.2f \n\t DArtagnan\tstart led: %d, end led: %d\tcolor: %.2f %.2f %.2f ",
+                 ros::this_node::getName().c_str(),
+                 goal->duration_on, goal->duration_off,
+                 start_ledAthos, end_ledAthos,
+                 goal->color1.r, goal->color1.g, goal->color1.b,
+                 start_ledPorthos, end_ledPorthos,
+                 goal->color2.r, goal->color2.g, goal->color2.b,
+                 start_ledAramis, end_ledAramis,
+                 goal->color3.r, goal->color3.g, goal->color3.b,
+                 start_ledDArtagnan, end_ledDArtagnan,
+                 goal->color4.r, goal->color4.g, goal->color4.b);
+
+        for(int i = 0; i < goal->blinks; ++i, --blinks_left)
+        {
+            // Set selected LEDs and turn them on
+            m_led->setRangeRGBf(goal->color1.r, goal->color1.g, goal->color1.b, m_numLeds, start_ledAthos, end_ledAthos);
+            m_led->setRangeRGBf(goal->color2.r, goal->color2.g, goal->color2.b, m_numLeds, start_ledPorthos, end_ledPorthos);
+            m_led->setRangeRGBf(goal->color3.r, goal->color3.g, goal->color3.b, m_numLeds, start_ledAramis, end_ledAramis);
+            m_led->setRangeRGBf(goal->color4.r, goal->color4.g, goal->color4.b, m_numLeds, start_ledDArtagnan, end_ledDArtagnan);
+            ros::Duration(goal->duration_on).sleep();
+            // Set selected LEDs and turn them off
+            m_led->setRangeRGBf(0, 0, 0, m_numLeds, start_ledAthos, end_ledAthos);
+            m_led->setRangeRGBf(0, 0, 0, m_numLeds, start_ledPorthos, end_ledPorthos);
+            m_led->setRangeRGBf(0, 0, 0, m_numLeds, start_ledAramis, end_ledAramis);
+            m_led->setRangeRGBf(0, 0, 0, m_numLeds, start_ledDArtagnan, end_ledDArtagnan);
+            ros::Duration(goal->duration_off).sleep();
+
+            feedback.blinks_left = blinks_left;
+            ROS_INFO("%s: Four Musketeers will blink %d more times", ros::this_node::getName().c_str(), feedback.blinks_left);
+            fourMusketeersAS.publishFeedback(feedback);
+        }
+
+        feedback.blinks_left = blinks_left;
+        ROS_INFO("%s: Four Musketeers will blink %d more times", ros::this_node::getName().c_str(), feedback.blinks_left);
+
+        m_led->setAllRGBf(0, 0, 0, m_numLeds);
+        result.blinks_left = blinks_left;
+        fourMusketeersAS.setSucceeded(result);
     }
 
     void runningBunnyCallback(const iirob_led::RunningBunnyGoal::ConstPtr& goal) {
