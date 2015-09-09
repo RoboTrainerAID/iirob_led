@@ -7,6 +7,7 @@ find_package(catkin REQUIRED COMPONENTS
   message_generation
   roscpp
   std_msgs
+  geometry_msgs
 )
 
 add_service_files(
@@ -14,15 +15,20 @@ add_service_files(
   SetLedDirectory.srv
 )
 
+add_message_files(
+  FILES
+  DirectionWithForce.msg
+)
+
 add_action_files(
   FILES
-  PlayLed.action            # ???
+  #PlayLed.action            # ???
   Blinky.action             # action 2
   Police.action             # action 3
   FourMusketeers.action     # action 4
   RunningBunny.action       # action 5
-  Spinner.action            # action 6
-  Changeling.action         # action 7
+  #Spinner.action            # action 6
+  #Changeling.action         # action 7
 )
 
 ## Generate added messages and services with any dependencies listed here
@@ -30,12 +36,13 @@ generate_messages(
   DEPENDENCIES
   actionlib_msgs
   std_msgs
+  geometry_msgs
 )
 
 catkin_package(
  INCLUDE_DIRS common/LED common/SERIAL
  LIBRARIES ${PROJECT_NAME}
- CATKIN_DEPENDS actionlib actionlib_msgs message_runtime roscpp std_msgs
+ CATKIN_DEPENDS actionlib actionlib_msgs message_runtime roscpp std_msgs geometry_msgs
  DEPENDS system_lib
 )
 

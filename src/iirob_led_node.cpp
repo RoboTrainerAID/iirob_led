@@ -6,8 +6,8 @@
 #include "iirob_led/PoliceAction.h"
 #include "iirob_led/FourMusketeersAction.h"
 #include "iirob_led/RunningBunnyAction.h"
-#include "iirob_led/ChangelingAction.h"
-#include "iirob_led/SpinnerAction.h"
+//#include "iirob_led/ChangelingAction.h"
+//#include "iirob_led/SpinnerAction.h"
 #include "iirob_led/SetLedDirectory.h"
 
 #include <std_msgs/String.h>
@@ -16,8 +16,6 @@
 #include <cmath>
 
 // TODO: OVERRIDE - when ready set to false
-// TODO: Put subscribers inside LEDNode
-// TODO: Merge init with constructor and store result inside status (class member)
 
 #include "LEDStrip.h"
 
@@ -35,13 +33,14 @@ class LEDNode
     ros::Subscriber subChosenDir;
     ros::Subscriber subLedColor;
 
+    ros::ServiceServer set_led_directory_srv;
+
     actionlib::SimpleActionServer<iirob_led::BlinkyAction> blinkyAS;
     actionlib::SimpleActionServer<iirob_led::PoliceAction> policeAS;
     actionlib::SimpleActionServer<iirob_led::FourMusketeersAction> fourMusketeersAS;
     actionlib::SimpleActionServer<iirob_led::RunningBunnyAction> runningBunnyAS;
-    actionlib::SimpleActionServer<iirob_led::ChangelingAction> changelingAS;
-    actionlib::SimpleActionServer<iirob_led::SpinnerAction> spinnerAS;
-
+    //actionlib::SimpleActionServer<iirob_led::ChangelingAction> changelingAS;
+    //actionlib::SimpleActionServer<iirob_led::SpinnerAction> spinnerAS;
 public:
 	//! Constructor.
     LEDNode(ros::NodeHandle nodeHandle, std::string const& _port, int const& _num)
@@ -50,17 +49,20 @@ public:
           blinkyAS(nodeHandle, "blinky", boost::bind(&LEDNode::blinkyCallback, this, _1), false),
           policeAS(nodeHandle, "police", boost::bind(&LEDNode::policeCallback, this, _1), false),
           fourMusketeersAS(nodeHandle, "four_musketeers", boost::bind(&LEDNode::fourMusketeersCallback, this, _1), false),
-          runningBunnyAS(nodeHandle, "running_bunny", boost::bind(&LEDNode::runningBunnyCallback, this, _1), false),
-          changelingAS(nodeHandle, "changeling", boost::bind(&LEDNode::changelingCallback, this, _1), false),
-          spinnerAS(nodeHandle, "spinner", boost::bind(&LEDNode::spinnerCallback, this, _1), false)
+          runningBunnyAS(nodeHandle, "running_bunny", boost::bind(&LEDNode::runningBunnyCallback, this, _1), false)
+          //changelingAS(nodeHandle, "changeling", boost::bind(&LEDNode::changelingCallback, this, _1), false),
+          //spinnerAS(nodeHandle, "spinner", boost::bind(&LEDNode::spinnerCallback, this, _1), false)
     {
         status = init(port, num);
 
         if(status)
         {
-            //subLedCommand = nh.subscribe("led_command", 10, &LEDNode::commandCallback, this);
-            //subChosenDir = nh.subscribe("chosen_directory", 10, &LEDNode::directoryCallback, this);
-            //subLedColor = nh.subscribe("led_color", 10, &LEDNode::colorCallback, this);
+            subLedCommand = nodeHandle.subscribe("led_command", 10, &LEDNode::commandCallback, this);
+            subChosenDir = nodeHandle.subscribe("chosen_directory", 10, &LEDNode::directoryCallback, this);
+            subLedColor = nodeHandle.subscribe("led_color", 10, &LEDNode::colorCallback, this);
+
+            set_led_directory_srv = nodeHandle.advertiseService("set_led_directory", &LEDNode::set_led_directory, this);
+            ROS_INFO("%s: IIROB-LED directory set to %s", ros::this_node::getName().c_str(), set_led_directory_srv.getService().c_str());
         }
     }
 
@@ -79,8 +81,14 @@ public:
         policeAS.shutdown();
         fourMusketeersAS.shutdown();
         runningBunnyAS.shutdown();
-        changelingAS.shutdown();
-        spinnerAS.shutdown();
+        //changelingAS.shutdown();
+        //spinnerAS.shutdown();
+
+        subLedCommand.shutdown();
+        subChosenDir.shutdown();
+        subLedColor.shutdown();
+
+        set_led_directory_srv.shutdown();
     }
 
     bool getStatus() { return status; }
@@ -112,10 +120,10 @@ public:
             ROS_INFO("fourMusketeers");
             runningBunnyAS.start();
             ROS_INFO("runningBunny");
-            changelingAS.start();
-            ROS_INFO("changeling");
-            spinnerAS.start();
-            ROS_INFO("spinner");
+            //changelingAS.start();
+            //ROS_INFO("changeling");
+            //spinnerAS.start();
+            //ROS_INFO("spinner");
 
             return true;
         }
@@ -585,13 +593,15 @@ public:
         runningBunnyAS.setSucceeded(result);
     }
 
-    void changelingCallback(const iirob_led::ChangelingGoal::ConstPtr& goal) {
+    /*void changelingCallback(const iirob_led::ChangelingGoal::ConstPtr& goal) {
 
-    }
+    }*/
 
-    void spinnerCallback(const iirob_led::SpinnerGoal::ConstPtr& goal) {
+    /*void spinnerCallback(const iirob_led::SpinnerGoal::ConstPtr& goal) {
 
-    }
+    }*/
+
+    void spin() { ros::spin(); }
 };
 
 int main(int argc, char **argv)
@@ -620,7 +630,7 @@ int main(int argc, char **argv)
 
     // move all that is below to LEDNode
     //if (ledNode->init(port, num)) {
-    if (ledNode->getStatus()) {
+    /*if (ledNode->getStatus()) {
 
         // MOVE THOSE TO CONSTRUCTOR OF LEDNODE
         ros::Subscriber sub = nh.subscribe("led_command", 10, &LEDNode::commandCallback, ledNode);
@@ -638,6 +648,8 @@ int main(int argc, char **argv)
     }
     else {
         ROS_ERROR("IIROB-LED node %s: Initializing ledNode on port %s with %d LEDs failed!", ros::this_node::getName().c_str(), port.c_str(), num);
-    }
+    }*/
+
+    ledNode->spin();
     return 0;
 }
