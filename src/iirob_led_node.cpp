@@ -20,6 +20,7 @@
 
 // TODO override - when ready set to false
 // TODO directoryCallback, set_led_directory - replace this with a vector (btw it's DIRECTION not directory -_-)
+// TODO Check return value for all iirob::hardware functions (setAllRGBf(), setRangeRGBf() etc.)
 // NOTE All the checks if start_led or end_led are negative or not can be avoided by simply using unsigned chars (as far as I can tell internally the LED library is actually using this type)
 // NOTE Except for color values (ColorRGBA requires float) use double (float64 in ROS) for more accuracy
 // FIXME Currently (and how it was implemented by Ruben) if start_led > end_led things screw up. Easiest workaround is to swap the values if such scenario occurs. More complex solution (but better one)
@@ -613,8 +614,11 @@ public:
     }
 
     // TODO Maybe expand this to be similar to blinky - support N number of cycles
+    /**
+     * @brief changelingCallback processes ChangelingGoal messages - similar to Blinky but currently only for a single "blink" and supports fluent transition from black to specifed color and reverse; previous name: lightActionCallback_7 with argument std_msgs::Float32MultiArray::ConstPtr&
+     * @param goal
+     */
     void changelingCallback(const iirob_led::ChangelingGoal::ConstPtr& goal) {
-        ROS_INFO("CHANGELING CALLBACK");
         iirob_led::ChangelingFeedback feedback;
         iirob_led::ChangelingResult result;
 
@@ -624,8 +628,8 @@ public:
         if(start_led < 0) start_led = 0;
 
         double step = goal->step;
-        if(step < 0.01) step = 0.1;
-        if(step > 0.5) step = 0.1;
+        if(step < 0.001) step = 0.1;
+        if(step > 0.5) step = 0.1;                  // De facto this is a Blinky action
         int stepsPerHalfCycle = 1/step;             // we use integer since there is no such thing as (for example) 1/3 loop cycle ;)
         int stepsPerCycle = 2*stepsPerHalfCycle;    // full cycle contains two half-cycles
         int currentStep;
@@ -651,8 +655,8 @@ public:
             ros::Duration(goal->time_between_steps).sleep();
             feedback.steps_in_cycle_left = stepsPerCycle - steps_temp;
             changelingAS.publishFeedback(feedback);
-            ROS_INFO("%d out of %d steps left until end of cycle", feedback.steps_in_cycle_left, stepsPerCycle);
-            ROS_INFO("HSV: %.2f %.2f %.2f", h, s, v);
+            ROS_DEBUG("%d out of %d steps left until end of cycle", feedback.steps_in_cycle_left, stepsPerCycle);
+            ROS_DEBUG("HSV: %.2f %.2f %.2f", h, s, v);
         }
 
         // Decrease value from 0.0 to 1.0 by step
@@ -662,10 +666,11 @@ public:
             ros::Duration(goal->time_between_steps).sleep();
             feedback.steps_in_cycle_left = stepsPerCycle - steps_temp;
             changelingAS.publishFeedback(feedback);
-            ROS_INFO("%d out of %d steps left until end of cycle", feedback.steps_in_cycle_left, stepsPerCycle);
-            ROS_INFO("HSV: %.2f %.2f %.2f", h, s, v);
+            ROS_DEBUG("%d out of %d steps left until end of cycle", feedback.steps_in_cycle_left, stepsPerCycle);
+            ROS_DEBUG("HSV: %.2f %.2f %.2f", h, s, v);
         }
 
+        m_led->setAllRGBf(0, 0, 0, m_numLeds);
         result.steps_in_cycle_left = currentStep;
         changelingAS.setSucceeded(result);
     }
