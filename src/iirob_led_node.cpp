@@ -37,7 +37,6 @@ class LEDNode
     bool status;        // Contains the return result from init()
     std::string port;
     int num;
-    bool restartFlag;   // Used for displaying conditional information when calling init() (see init() for further details)
 
     ros::Subscriber subLedCommand;
     ros::Subscriber subChosenDir;
@@ -51,6 +50,33 @@ class LEDNode
     actionlib::SimpleActionServer<iirob_led::RunningBunnyAction> runningBunnyAS;
     actionlib::SimpleActionServer<iirob_led::ChangelingAction> changelingAS;
     //actionlib::SimpleActionServer<iirob_led::SpinnerAction> spinnerAS;
+
+    bool init(std::string const & port, int const & num) {
+        m_led = new iirob_hardware::LEDStrip(port);
+        if (m_led->ready()) {
+            m_numLeds = num;
+            m_led->setAllRGBf(0, 0, 0, m_numLeds);
+            m_led->setUniRGB(0, 0, 0);
+            //m_showDir = 4;
+
+            ROS_INFO("%s: IIROB-LED action server started", ros::this_node::getName().c_str());
+            ROS_INFO("Number of LEDs: %d", m_numLeds);
+
+            blinkyAS.start();
+            ROS_INFO("blinky");
+            policeAS.start();
+            ROS_INFO("police");
+            fourMusketeersAS.start();
+            ROS_INFO("fourMusketeers");
+            runningBunnyAS.start();
+            ROS_INFO("runningBunny");
+            changelingAS.start();
+            ROS_INFO("changeling");
+
+            return true;
+        }
+        return false;
+    }
 public:
 	//! Constructor.
     LEDNode(ros::NodeHandle nodeHandle, std::string const& _port, int const& _num)
@@ -102,61 +128,6 @@ public:
     }
 
     bool getStatus() { return status; }
-
-    bool init(std::string const & port, int const & num) {
-        m_led = new iirob_hardware::LEDStrip(port);
-        if (m_led->ready()) {
-            m_numLeds = num;
-            m_led->setAllRGBf(0, 0, 0, m_numLeds);
-            m_led->setUniRGB(0, 0, 0);
-            //m_showDir = 4;
-
-            //blinkyAS.start();
-            ROS_INFO("%s: IIROB-LED action server started", ros::this_node::getName().c_str());
-            ROS_INFO("Number of LEDs: %d", m_numLeds);
-
-            // NOTE It seems that the init might also be there in order to reconfigure the LEDNode so
-            // it might be a good idea to check here if the action servers are active and if so
-            // shut those down and start again. Unless init() is just a mishap and actually has to
-            // be part of the constructor
-
-            if(!restartFlag) ROS_INFO("Starting action servers:");
-            else ROS_INFO("Restarting action servers:");
-            if(blinkyAS.isActive()) {
-                ROS_WARN_COND((blinkyAS.isPreemptRequested() || blinkyAS.isNewGoalAvailable()), "Action server has preempt request or a panding new goal!");
-                blinkyAS.shutdown();
-            }
-            blinkyAS.start();
-            ROS_INFO("blinky");
-            if(policeAS.isActive()) {
-                ROS_WARN_COND((policeAS.isPreemptRequested() || policeAS.isNewGoalAvailable()), "Action server has preempt request or a panding new goal!");
-                policeAS.shutdown();
-            }
-            policeAS.start();
-            ROS_INFO("police");
-            if(fourMusketeersAS.isActive()) {
-                ROS_WARN_COND((fourMusketeersAS.isPreemptRequested() || fourMusketeersAS.isNewGoalAvailable()), "Action server has preempt request or a panding new goal!");
-                fourMusketeersAS.shutdown();
-            }
-            fourMusketeersAS.start();
-            ROS_INFO("fourMusketeers");
-            if(runningBunnyAS.isActive()) {
-                ROS_WARN_COND((runningBunnyAS.isPreemptRequested() || runningBunnyAS.isNewGoalAvailable()), "Action server has preempt request or a panding new goal!");
-                runningBunnyAS.shutdown();
-            }
-            runningBunnyAS.start();
-            ROS_INFO("runningBunny");
-            if(changelingAS.isActive()) {
-                ROS_WARN_COND((changelingAS.isPreemptRequested() || changelingAS.isNewGoalAvailable()), "Action server has preempt request or a panding new goal!");
-                changelingAS.shutdown();
-            }
-            changelingAS.start();
-            ROS_INFO("changeling");
-
-            return true;
-        }
-        return false;
-    }
 
 	//! Callback function for subscriber.
 	void commandCallback(const std_msgs::String::ConstPtr& msg) {
