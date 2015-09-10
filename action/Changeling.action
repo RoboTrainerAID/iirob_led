@@ -1,10 +1,13 @@
-float32 duration    # in [s]
-float32 frequency   # in [Hz]
-std_msgs/ColorRGBA color     # RGB values [0-1]
-int32 start_led
-int32 end_led
-int32 directory_size
+# A cycle is defined as a full transition for a color with value (HSV) 0% to 100% and back to 0%
+# Each increase/decrease of the value inside a cycle is defined as a step. A cycle contains all
+# steps. Once defined a step is constant for both increasing and decreasing the value
+
+std_msgs/ColorRGBA color    # RGB values [0-1] for all LEDs
+int32 start_led             # First LED in the stripe where LEDs will blink
+int32 end_led               # Last LED in the stripe where LEDs will blink
+float64 step                # Defines granularity of the value (HSV) for a given RGB color; it also influences the speed since step determines how many steps a cycle contains
+float64 time_between_steps  # Defines the transition speed between steps (default: 0.1; maximum: 0.5; minimum: 0.01 due to restrictions what the eye can actually register when it comes to changing the value of a color)
 ---
-float32 real_duration # in [s]
+int32 steps_in_cycle_left   # Number of steps left in the cycle
 ---
-float32 until_end   # in [s]
+int32 steps_in_cycle_left   # Number of steps left in the cycle

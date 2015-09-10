@@ -2,9 +2,9 @@ int32 blinks                    # Number of flashes (1 flash = 1 time on + 1 tim
 int32 fast_blinks               # Number of flashes (1 flash = 1 time on + 1 time off) - duration: short (takes place from one long flash to another)
 
 # TODO: put fast_duration_on and off inside a single parameter that is simply split in 2 (similar to the LED stripe) and the information about on/off duration is extracted from there
-float32 fast_duration_on        # These two parameters determine how fast the flashes with short duration are
-float32 fast_duration_off       # in [s] (use 0.0x as values since it looks more like fast flashing)
-float32 pause_between_long_blinks # pause between each set of fast flashes; in [s] or [ms]
+float64 fast_duration_on        # These two parameters determine how fast the flashes with short duration are
+float64 fast_duration_off       # in [s] (use 0.0x as values since it looks more like fast flashing)
+float64 pause_between_long_blinks # pause between each set of fast flashes; in [s] or [ms]
 
 #######################################################
 # The given stripe (start to end) is always devided   #

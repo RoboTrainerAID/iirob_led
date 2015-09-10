@@ -1,4 +1,5 @@
 #include <ros/ros.h>
+#include <ros/console.h>
 #include "actionlib/server/simple_action_server.h"
 
 //#include "iirob_led/PlayLedAction.h"
@@ -6,7 +7,7 @@
 #include "iirob_led/PoliceAction.h"
 #include "iirob_led/FourMusketeersAction.h"
 #include "iirob_led/RunningBunnyAction.h"
-//#include "iirob_led/ChangelingAction.h"
+#include "iirob_led/ChangelingAction.h"
 //#include "iirob_led/SpinnerAction.h"
 #include "iirob_led/SetLedDirectory.h"
 
@@ -15,7 +16,14 @@
 
 #include <cmath>
 
-// TODO: OVERRIDE - when ready set to false
+#include <RGBConverter.h>
+
+// TODO override - when ready set to false
+// TODO directoryCallback, set_led_directory - replace this with a vector (btw it's DIRECTION not directory -_-)
+// NOTE All the checks if start_led or end_led are negative or not can be avoided by simply using unsigned chars (as far as I can tell internally the LED library is actually using this type)
+// NOTE Except for color values (ColorRGBA requires float) use double (float64 in ROS) for more accuracy
+// FIXME Currently (and how it was implemented by Ruben) if start_led > end_led things screw up. Easiest workaround is to swap the values if such scenario occurs. More complex solution (but better one)
+//       is to split the given strap in 2 parts (see RunningBunny case where there is an issue when we transit from the last led (423 I think it was) to the first one (0))
 
 #include "LEDStrip.h"
 
@@ -25,9 +33,10 @@ class LEDNode
     int m_numLeds;
     iirob_hardware::LEDStrip* m_led;
     int m_showDir;
-    bool status;        // contains the return result from init()
+    bool status;        // Contains the return result from init()
     std::string port;
     int num;
+    bool restartFlag;   // Used for displaying conditional information when calling init() (see init() for further details)
 
     ros::Subscriber subLedCommand;
     ros::Subscriber subChosenDir;
@@ -39,7 +48,7 @@ class LEDNode
     actionlib::SimpleActionServer<iirob_led::PoliceAction> policeAS;
     actionlib::SimpleActionServer<iirob_led::FourMusketeersAction> fourMusketeersAS;
     actionlib::SimpleActionServer<iirob_led::RunningBunnyAction> runningBunnyAS;
-    //actionlib::SimpleActionServer<iirob_led::ChangelingAction> changelingAS;
+    actionlib::SimpleActionServer<iirob_led::ChangelingAction> changelingAS;
     //actionlib::SimpleActionServer<iirob_led::SpinnerAction> spinnerAS;
 public:
 	//! Constructor.
@@ -49,8 +58,8 @@ public:
           blinkyAS(nodeHandle, "blinky", boost::bind(&LEDNode::blinkyCallback, this, _1), false),
           policeAS(nodeHandle, "police", boost::bind(&LEDNode::policeCallback, this, _1), false),
           fourMusketeersAS(nodeHandle, "four_musketeers", boost::bind(&LEDNode::fourMusketeersCallback, this, _1), false),
-          runningBunnyAS(nodeHandle, "running_bunny", boost::bind(&LEDNode::runningBunnyCallback, this, _1), false)
-          //changelingAS(nodeHandle, "changeling", boost::bind(&LEDNode::changelingCallback, this, _1), false),
+          runningBunnyAS(nodeHandle, "running_bunny", boost::bind(&LEDNode::runningBunnyCallback, this, _1), false),
+          changelingAS(nodeHandle, "changeling", boost::bind(&LEDNode::changelingCallback, this, _1), false)
           //spinnerAS(nodeHandle, "spinner", boost::bind(&LEDNode::spinnerCallback, this, _1), false)
     {
         status = init(port, num);
@@ -81,7 +90,7 @@ public:
         policeAS.shutdown();
         fourMusketeersAS.shutdown();
         runningBunnyAS.shutdown();
-        //changelingAS.shutdown();
+        changelingAS.shutdown();
         //spinnerAS.shutdown();
 
         subLedCommand.shutdown();
@@ -105,25 +114,43 @@ public:
             ROS_INFO("%s: IIROB-LED action server started", ros::this_node::getName().c_str());
             ROS_INFO("Number of LEDs: %d", m_numLeds);
 
-            // NOTE:
-            // It seems that the init might also be there in order to reconfigure the LEDNode so
+            // NOTE It seems that the init might also be there in order to reconfigure the LEDNode so
             // it might be a good idea to check here if the action servers are active and if so
             // shut those down and start again. Unless init() is just a mishap and actually has to
             // be part of the constructor
 
-            ROS_INFO("Starting actions servers: ");
+            if(!restartFlag) ROS_INFO("Starting action servers:");
+            else ROS_INFO("Restarting action servers:");
+            if(blinkyAS.isActive()) {
+                ROS_WARN_COND((blinkyAS.isPreemptRequested() || blinkyAS.isNewGoalAvailable()), "Action server has preempt request or a panding new goal!");
+                blinkyAS.shutdown();
+            }
             blinkyAS.start();
             ROS_INFO("blinky");
+            if(policeAS.isActive()) {
+                ROS_WARN_COND((policeAS.isPreemptRequested() || policeAS.isNewGoalAvailable()), "Action server has preempt request or a panding new goal!");
+                policeAS.shutdown();
+            }
             policeAS.start();
             ROS_INFO("police");
+            if(fourMusketeersAS.isActive()) {
+                ROS_WARN_COND((fourMusketeersAS.isPreemptRequested() || fourMusketeersAS.isNewGoalAvailable()), "Action server has preempt request or a panding new goal!");
+                fourMusketeersAS.shutdown();
+            }
             fourMusketeersAS.start();
             ROS_INFO("fourMusketeers");
+            if(runningBunnyAS.isActive()) {
+                ROS_WARN_COND((runningBunnyAS.isPreemptRequested() || runningBunnyAS.isNewGoalAvailable()), "Action server has preempt request or a panding new goal!");
+                runningBunnyAS.shutdown();
+            }
             runningBunnyAS.start();
             ROS_INFO("runningBunny");
-            //changelingAS.start();
-            //ROS_INFO("changeling");
-            //spinnerAS.start();
-            //ROS_INFO("spinner");
+            if(changelingAS.isActive()) {
+                ROS_WARN_COND((changelingAS.isPreemptRequested() || changelingAS.isNewGoalAvailable()), "Action server has preempt request or a panding new goal!");
+                changelingAS.shutdown();
+            }
+            changelingAS.start();
+            ROS_INFO("changeling");
 
             return true;
         }
@@ -193,7 +220,7 @@ public:
         }
 
         /*
-         * NOTE: See what exactly "chosen_directory" is. From what I see above it seems that it only
+         * NOTE See what exactly "chosen_directory" is. From what I see above it seems that it only
          * contains single character strings and frankly it doesn't make much sense to use complete strings
          * if that's the case
          *
@@ -319,9 +346,10 @@ public:
         as_.setSucceeded(result);
     }*/
 
-    // Old name: lightActionCallback_2 with argument std_msgs::Float32MultiArray::ConstPtr&
-    // New name: Blinky
-    // Description: turns on and off selected LEDs
+    /**
+     * @brief blinkyCallback processes BlinkyActionGoal messages - it turns on and off a give stripe of LEDs; previous name: lightActionCallback_2 with argument std_msgs::Float32MultiArray::ConstPtr&
+     * @param goal
+     */
     void blinkyCallback(const iirob_led::BlinkyGoal::ConstPtr& goal) {
         iirob_led::BlinkyFeedback feedback;
         iirob_led::BlinkyResult result;
@@ -358,7 +386,11 @@ public:
         blinkyAS.setSucceeded(result);
     }
 
-    // TODO: Change Police action message
+
+    /**
+     * @brief policeCallback processes PoliceActionGoal messages - it turns on and off a give stripe of LEDs mimicing a police light; previous name: lightActionCallback_3 with argument std_msgs::Float32MultiArray::ConstPtr&
+     * @param goal
+     */
     void policeCallback(const iirob_led::PoliceGoal::ConstPtr& goal) {
         iirob_led::PoliceFeedback feedback;
         iirob_led::PoliceResult result;
@@ -373,34 +405,13 @@ public:
         int totLength = (end_led - start_led);
         ROS_INFO("SETUP COMPLETED");
 
-        // Check if size of each inner stripe is equal or greater then the number of LEDs dedicated for half of the full stripe
-        // In case this is true we convert the PoliceGoal into a BlinkyGoal since there is no difference between those in this scenario
-        /*if((num_inner_leds >= (int)totLength/2) || (num_inner_leds <= 0)) // maybe floor or ceil here are better suited here; also using uint here would release us from the burden of checking for values < 0
-        {
-            iirob_led::BlinkyGoal propagated_goal;
-            propagated_goal.blinks = blinks_left;
-            propagated_goal.color = goal->color_outer;         // We use only one of the 4 given colours for Blinky
-            propagated_goal.duration_on = goal->fast_duration_on;   // We use the on/off durations for the fast blinks only
-            propagated_goal.duration_off = goal->fast_duration_off;
-            propagated_goal.start_led = start_led;
-            propagated_goal.end_led = end_led;
-            //iirob_led::BlinkyGoal::ConstPtr g = &propagated_goal;
-            //this->blinkyCallback(g);
-
-            // Figure out a proper propagation mechanism. Even if we convert the PoliceGoal to BlinkyGoal the feedback and result still have to be for the Police action!
-            // ...
-
-            // Else we can rewrite Blinky here to handle this case
-
-            return;
-        }*/
-
         // Probably this here needs some rework
+        double half = totLength/2;
         int start_led_left_outer = start_led;
-        int end_led_left_outer = start_led + ((int)totLength/2 - num_inner_leds);
+        int end_led_left_outer = start_led + ((int)half - num_inner_leds);
 
         int start_led_left_inner = end_led_left_outer;
-        int end_led_left_inner = start_led + (int)totLength/2;
+        int end_led_left_inner = start_led + (int)half;
 
         int start_led_right_inner = end_led_left_inner;
         int end_led_right_inner = start_led_right_inner + num_inner_leds - 1;
@@ -462,6 +473,10 @@ public:
         policeAS.setSucceeded(result);
     }
 
+    /**
+     * @brief fourMusketeersCallback processes FourMusketeersGoal messages - it turns on and off a give stripe of LEDs which is split into 4 separate simultaniously blinking sections with different colors; previous name: lightActionCallback_4 with argument std_msgs::Float32MultiArray::ConstPtr&
+     * @param goal
+     */
     void fourMusketeersCallback(const iirob_led::FourMusketeersGoal::ConstPtr& goal) {
         iirob_led::FourMusketeersFeedback feedback;
         iirob_led::FourMusketeersResult result;
@@ -531,6 +546,10 @@ public:
         fourMusketeersAS.setSucceeded(result);
     }
 
+    /**
+     * @brief runningBunnyCallback processes RunningBunnyGoal messages - a given stripe of LEDs (bunny) "jumps" in circle (a jump is defined as the number of LEDs that are skipped by the bunny); previous name: lightActionCallback_6 with argument std_msgs::Float32MultiArray::ConstPtr&
+     * @param goal
+     */
     void runningBunnyCallback(const iirob_led::RunningBunnyGoal::ConstPtr& goal) {
         // TODO Use modulo to create a neat transition between previous and next circle!
         // TODO Change RGB values logarithmic
@@ -593,9 +612,63 @@ public:
         runningBunnyAS.setSucceeded(result);
     }
 
-    /*void changelingCallback(const iirob_led::ChangelingGoal::ConstPtr& goal) {
+    // TODO Maybe expand this to be similar to blinky - support N number of cycles
+    void changelingCallback(const iirob_led::ChangelingGoal::ConstPtr& goal) {
+        ROS_INFO("CHANGELING CALLBACK");
+        iirob_led::ChangelingFeedback feedback;
+        iirob_led::ChangelingResult result;
 
-    }*/
+        int start_led = goal->start_led;
+        int end_led = goal->end_led;
+
+        if(start_led < 0) start_led = 0;
+
+        double step = goal->step;
+        if(step < 0.01) step = 0.1;
+        if(step > 0.5) step = 0.1;
+        int stepsPerHalfCycle = 1/step;             // we use integer since there is no such thing as (for example) 1/3 loop cycle ;)
+        int stepsPerCycle = 2*stepsPerHalfCycle;    // full cycle contains two half-cycles
+        int currentStep;
+        int steps_temp = 0; // Use for counting how many steps we have done so far
+
+        float r = goal->color.r;
+        float g = goal->color.g;
+        float b = goal->color.b;
+        float h, s, v;
+
+        // Initial conversion
+        RGBConverter::rgbToHsv(r, g, b, &h, &s, &v);
+
+        ROS_INFO("Target color (RGB): %.2f %.2f %.2f", r, g, b);
+        ROS_INFO("Target color (HSV): %.2f %.2f %.2f", h, s, v);
+        v = 0.0;    // Reset value (HSV) since this is the component that we will be working with
+        ROS_INFO("Number of steps per cycle (single step = %.2f): %d", step, stepsPerCycle);
+
+        // Increase value from 0.0 to 1.0 by step
+        for(currentStep = 0; currentStep < stepsPerHalfCycle; v += step, ++currentStep, ++steps_temp) {
+            RGBConverter::hsvToRgb(h, s, v, &r, &g, &b);
+            m_led->setRangeRGBf(r, g, b, m_numLeds, start_led, end_led);
+            ros::Duration(goal->time_between_steps).sleep();
+            feedback.steps_in_cycle_left = stepsPerCycle - steps_temp;
+            changelingAS.publishFeedback(feedback);
+            ROS_INFO("%d out of %d steps left until end of cycle", feedback.steps_in_cycle_left, stepsPerCycle);
+            ROS_INFO("HSV: %.2f %.2f %.2f", h, s, v);
+        }
+
+        // Decrease value from 0.0 to 1.0 by step
+        for(currentStep = stepsPerHalfCycle; currentStep >= 0; v -= step, --currentStep, ++steps_temp) {
+            RGBConverter::hsvToRgb(h, s, v, &r, &g, &b);
+            m_led->setRangeRGBf(r, g, b, m_numLeds, start_led, end_led);
+            ros::Duration(goal->time_between_steps).sleep();
+            feedback.steps_in_cycle_left = stepsPerCycle - steps_temp;
+            changelingAS.publishFeedback(feedback);
+            ROS_INFO("%d out of %d steps left until end of cycle", feedback.steps_in_cycle_left, stepsPerCycle);
+            ROS_INFO("HSV: %.2f %.2f %.2f", h, s, v);
+        }
+
+        result.steps_in_cycle_left = currentStep;
+        changelingAS.setSucceeded(result);
+    }
 
     /*void spinnerCallback(const iirob_led::SpinnerGoal::ConstPtr& goal) {
 
@@ -650,6 +723,6 @@ int main(int argc, char **argv)
         ROS_ERROR("IIROB-LED node %s: Initializing ledNode on port %s with %d LEDs failed!", ros::this_node::getName().c_str(), port.c_str(), num);
     }*/
 
-    ledNode->spin();
+    if(ledNode->getStatus()) ledNode->spin();
     return 0;
 }

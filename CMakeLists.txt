@@ -27,8 +27,8 @@ add_action_files(
   Police.action             # action 3
   FourMusketeers.action     # action 4
   RunningBunny.action       # action 5
-  #Spinner.action            # action 6
-  #Changeling.action         # action 7
+  Spinner.action            # action 6
+  Changeling.action         # action 7
 )
 
 ## Generate added messages and services with any dependencies listed here
@@ -73,7 +73,7 @@ add_executable(${PROJECT_NAME}_node src/iirob_led_node.cpp)
 add_dependencies(${PROJECT_NAME}_node ${PROJECT_NAME}_generate_messages_cpp)
 target_link_libraries(${PROJECT_NAME}_node
   ${PROJECT_NAME}
-  #rgbconverter
+  rgbconverter
   ${catkin_LIBRARIES}
 )
 
