@@ -255,15 +255,19 @@ std::vector<float> LEDStrip::hueToRGB(float hue) {
 	return rgb;
 }
 
+//////////////////////////////////////////////////////////////////////////////////////////////
+// TODO Add circular buffer
+// TODO Add the case where start_led > end_led. Right now if this happens the result is nada
+// TODO Document the library
 //Methods for modifying individual parts of the strip
-bool LEDStrip::setXRangeRGB(unsigned char* rgb, int n, int b, int e, bool log) {
+bool LEDStrip::setXRangeRGB(unsigned char* rgb, int n, int start_led, int end_led, bool log) {
 	if ((n*3+4)>sizeof(buf))
 		return false;
 	bool ok = true;
 	buf[0] = LEDStrip::START;
 	buf[1] = (char)(n>>8);
 	buf[2] = (char)n;
-	for (int i = 2+(b*3)+1; i<(e*3+2)+1; i++) //+1
+    for (int i = 2+(start_led*3)+1; i<(end_led*3+2)+1; i++) //+1
         buf[i] = log ? led_lut[*rgb++] : *rgb++;
 	buf[n*3+3] = LEDStrip::END;
 	ok &= send(buf, n*3+4);
@@ -272,7 +276,7 @@ bool LEDStrip::setXRangeRGB(unsigned char* rgb, int n, int b, int e, bool log) {
 	return ok;
 }
 
-bool LEDStrip::setRangeRGB(unsigned char red, unsigned char green, unsigned char blue, int n, int b, int e, bool log){
+bool LEDStrip::setRangeRGB(unsigned char red, unsigned char green, unsigned char blue, int n, int start_led, int end_led, bool log){
 	if (n*3>sizeof(rgbtemp))
 		return false;
 	for (int i = 0; i<(n*3); i+=3) {
@@ -286,10 +290,10 @@ bool LEDStrip::setRangeRGB(unsigned char red, unsigned char green, unsigned char
 		rgbtemp[i+2] = red;
 #endif
 	}
-	return setXRangeRGB(rgbtemp, n, b, e, log);
+    return setXRangeRGB(rgbtemp, n, start_led, end_led, log);
 }
 
-bool LEDStrip::setRangeRGBf(float red, float green, float blue, int n, int b, int e, bool log) {
+bool LEDStrip::setRangeRGBf(float red, float green, float blue, int n, int start_led, int end_led, bool log) {
 	return LEDStrip::setRangeRGB((unsigned char)(red*255.0), (unsigned char)(green*255.0),
-			(unsigned char)(blue*255.0), n, b, e, log);
+            (unsigned char)(blue*255.0), n, start_led, end_led, log);
 }

@@ -21,7 +21,9 @@
 // TODO override - when ready set to false
 // TODO directoryCallback, set_led_directory - replace this with a vector (btw it's DIRECTION not directory -_-)
 // TODO Check return value for all iirob::hardware functions (setAllRGBf(), setRangeRGBf() etc.)
-// NOTE All the checks if start_led or end_led are negative or not can be avoided by simply using unsigned chars (as far as I can tell internally the LED library is actually using this type)
+// TODO Add a duration parameter (number of steps per cycle should be determined from it) to Changeling (just add two modes)
+// TODO All the checks if start_led or end_led are negative or not can be avoided by simply using unsigned chars (as far as I can tell internally the LED library is actually using this type)
+// TODO Reimplement setRangeRGBX, setRangeRGB and setRangeRGBf. The way those three are working now is - to put it mildly - in a very poor manner.
 // NOTE Except for color values (ColorRGBA requires float) use double (float64 in ROS) for more accuracy
 // FIXME Currently (and how it was implemented by Ruben) if start_led > end_led things screw up. Easiest workaround is to swap the values if such scenario occurs. More complex solution (but better one)
 //       is to split the given strap in 2 parts (see RunningBunny case where there is an issue when we transit from the last led (423 I think it was) to the first one (0))
@@ -94,10 +96,10 @@ public:
         if(status)
         {
             subLedCommand = nodeHandle.subscribe("led_command", 10, &LEDNode::commandCallback, this);
-            subChosenDir = nodeHandle.subscribe("chosen_directory", 10, &LEDNode::directoryCallback, this);
+            subChosenDir = nodeHandle.subscribe("chosen_directory", 10, &LEDNode::ledDirectionCallback, this);
             subLedColor = nodeHandle.subscribe("led_color", 10, &LEDNode::colorCallback, this);
 
-            set_led_directory_srv = nodeHandle.advertiseService("set_led_directory", &LEDNode::set_led_directory, this);
+            set_led_directory_srv = nodeHandle.advertiseService("set_led_directory", &LEDNode::setLedDirection, this);
             ROS_INFO("%s: IIROB-LED directory set to %s", ros::this_node::getName().c_str(), set_led_directory_srv.getService().c_str());
         }
     }
@@ -106,7 +108,7 @@ public:
 	~LEDNode(){
         ROS_INFO("Turning all LEDs off");
 		//turn everything off again
-		if (m_led) {
+        if (m_led) {
 			m_led->setAllRGBf(0, 0, 0, m_numLeds);
 			m_led->setUniRGB(0, 0, 0);
 			delete m_led;
@@ -170,20 +172,19 @@ public:
 		//m_led->setAllRGBf(msg->r, msg->g, msg->b, m_numLeds);
 	}
 
-	//Empfangen der Richtung
-    void directoryCallback(const std_msgs::String::ConstPtr& msg) {
+    void ledDirectionCallback(const std_msgs::String::ConstPtr& msg) {
         std::string tempMsg = msg->data.c_str();
 
-        if (tempMsg == "r") {
+        if (tempMsg == "r") {       // right
             m_showDir = 0;
         }
-        else if (tempMsg == "l") {
+        else if (tempMsg == "l") {  // left
             m_showDir = 1;
         }
-        else if (tempMsg == "b") {
+        else if (tempMsg == "b") {  // back
             m_showDir = 2;
         }
-        else if (tempMsg == "f") {
+        else if (tempMsg == "f") {  // front
             m_showDir = 3;
         }
         else {
@@ -221,7 +222,7 @@ public:
         */
 	}
 
-	bool set_led_directory(iirob_led::SetLedDirectory::Request &req,
+    bool setLedDirection(iirob_led::SetLedDirectory::Request &req,
                            iirob_led::SetLedDirectory::Response &res)
     {
         ROS_INFO("I heard: [%f %f %f %f %d %d]",
@@ -229,94 +230,6 @@ public:
         m_led->setRangeRGBf(req.color.r, req.color.g, req.color.b, m_numLeds, req.start_led, req.end_led);
         return true;
     }
-
-    /*void playLed(const iirob_led::PlayLedGoalConstPtr& goal)
-    {
-        iirob_led::PlayLedFeedback feedback;
-        iirob_led::PlayLedResult result;
-        double begin = ros::Time::now().toSec();
-        double time_diff;
-        ros::Rate frequency(goal->frequency);
-        int i = 0;
-        int num_leds_middle, num_leds_begin_end;
-        int start_led = goal->start_led;
-        int end_led = goal->end_led;
-        int directory_size = goal->directory_size;
-        float hue = 0.0;
-        float factor;
-
-        if (end_led >= m_numLeds) {
-            end_led = m_numLeds-1;
-        }
-
-//         while (! m_cancelFlag ) {
-//         hue += 0.01;
-//         if (hue >= 1.0)
-//             hue -= 1.0;
-//         m_led->setAllHue(hue, m_numLeds);
-//         //OpenThreads::Thread::microSleep(m_msec*1000);
-//     }
-
-        ROS_DEBUG("%s starting PlayLed action with duration %f s, frequency %f Hz, color [%f %f %f] [RGB]. Duration: %f sec, frequency: %f Hz, start led: %d, end led: %d, directory: %d",
-                 ros::this_node::getName().c_str(), goal->duration, goal->frequency,
-                 goal->color.r, goal->color.g, goal->color.b, goal->duration, goal->frequency, goal->start_led, goal->end_led, goal->directory_size);
-
-        while(true) {
-
-            if (time_diff >= goal->duration) {
-                break;
-            }
-
-            if (start_led == 0 && end_led == 0 && directory_size == 0) {
-                hue += 0.01;
-                if (hue >= 1.0) {
-                    hue -= 1.0;
-                }
-                m_led->setAllHue(hue, m_numLeds);
-            }
-            else if (goal->directory_size == 0) {
-                m_led->setRangeRGBf(goal->color.r, goal->color.g, goal->color.b, m_numLeds, start_led, end_led);
-            }
-            else {
-                if (goal->directory_size < 3) {
-                    m_led->setRangeRGBf(goal->color.r, goal->color.g, goal->color.b, m_numLeds, i, i+directory_size);
-                }
-                else {
-                    m_led->setAllRGB(0, 0, 0, m_numLeds);
-                    num_leds_begin_end = directory_size/3;
-                    num_leds_middle = 2*num_leds_begin_end;
-                    for (int j = 1; j <= num_leds_begin_end; j++) {
-                        factor = (1.0/num_leds_begin_end)*j;
-                        ROS_INFO("%f", factor);
-                        m_led->setRangeRGBf((goal->color.r)*factor, (goal->color.g)*factor, (goal->color.b)*factor, m_numLeds,
-                                            i+j-1, i+j-1);
-                    }
-                    m_led->setRangeRGBf(goal->color.r, goal->color.g, goal->color.b, m_numLeds,
-                                            i+num_leds_begin_end, i+num_leds_begin_end+num_leds_middle);
-                    for (int j = 1; j <= num_leds_begin_end; j++) {
-                        factor = (1.0/num_leds_begin_end)*(num_leds_begin_end-j+1);
-                        m_led->setRangeRGBf((goal->color.r)*factor, (goal->color.g)*factor, (goal->color.b)*factor, m_numLeds,
-                                            i+num_leds_begin_end+num_leds_middle+j, i+num_leds_begin_end+num_leds_middle+j);
-                    }
-                }
-                i++;
-                i = (i+directory_size)%end_led;
-                if (i < start_led) {
-                    i = start_led;
-                }
-            }
-            feedback.until_end = time_diff;
-            ROS_DEBUG("%s: PlayLedAction until end %f s", ros::this_node::getName().c_str(), feedback.until_end);
-            as_.publishFeedback(feedback);
-
-            frequency.sleep();
-            time_diff = ros::Time::now().toSec() - begin;
-        }
-
-        m_led->setAllRGB(0, 0, 0, m_numLeds);
-        result.real_duration = time_diff;
-        as_.setSucceeded(result);
-    }*/
 
     /**
      * @brief blinkyCallback processes BlinkyActionGoal messages - it turns on and off a give stripe of LEDs; previous name: lightActionCallback_2 with argument std_msgs::Float32MultiArray::ConstPtr&
@@ -445,6 +358,7 @@ public:
         policeAS.setSucceeded(result);
     }
 
+
     /**
      * @brief fourMusketeersCallback processes FourMusketeersGoal messages - it turns on and off a give stripe of LEDs which is split into 4 separate simultaniously blinking sections with different colors; previous name: lightActionCallback_4 with argument std_msgs::Float32MultiArray::ConstPtr&
      * @param goal
@@ -518,11 +432,87 @@ public:
         fourMusketeersAS.setSucceeded(result);
     }
 
+    void runningBunnyCallback(const iirob_led::RunningBunnyGoal::ConstPtr& goal) {
+        iirob_led::RunningBunnyFeedback feedback;
+        iirob_led::RunningBunnyResult result;
+
+        int head = goal->head;
+        int body = goal->body;
+        float r = goal->color.r;
+        float g = goal->color.g;
+        float b = goal->color.b;
+        int counter = 0;
+        int circles = goal->num_circles;
+        bool split = false;
+        int _splitPos = 0;
+        int _after_split = m_numLeds-1;
+        int _head, _tail = head - body;
+        int _tail_non_negative = (_tail < 0) ? _tail + m_numLeds : _tail;   //423-1 = 422, 423-2 = 421, 423-3 = 420 ...
+        int _tail_non_negative_old = _tail_non_negative-1;
+
+
+        printf("Starting position: (head[%d] - tail[%d])\n-----------------------------------------\n", head, (head - body) % m_numLeds);
+
+        for(int circle = 0; circle < circles; circle++) {
+            _head = head;
+            _tail = head - body;
+            //_tail_non_negative_old = _tail_non_negative;
+
+            for(counter = 0; counter < m_numLeds; counter+=goal->skip_leds_per_step) {
+                //_tail_non_negative_old = _tail_non_negative-1;
+
+                if(_tail < 0) {
+                    split = true;
+                    _tail_non_negative = _tail + m_numLeds;
+                } else {
+                    split = false;
+                    _tail_non_negative = _tail;
+                }
+
+                ROS_INFO("[%d] : (head[%d] - tail[%d])\tsplit %s", counter, _head, _tail_non_negative, split ? "+" : "-");
+
+                if(split) {
+                    ROS_INFO("\t\t\\_________(head[%d] - split[%d] | after_split[%d] - tail[%d])\n", _head, _splitPos, _after_split, _tail_non_negative);
+                    //m_led->setRangeRGBf(r, g, b, m_numLeds, _tail_non_negative, _after_split);   // We finish the current LED stripe (x->422)
+                    //m_led->setRangeRGBf(r, g, b, m_numLeds, _splitPos, _head);                   // Then we start the next (0->y)
+                    ROS_INFO("Turning off LEDs %d to %d", _head+1, _tail_non_negative-1);
+                    //m_led->setRangeRGBf(0, 0, 0, m_numLeds, _head+1, _tail_non_negative-1);      // And finally we turn "off" all (y+1->x-1) (I've noticed that when we overlap LEDs it screws up things)
+                } else {
+                    m_led->setRangeRGBf(r, g, b, m_numLeds, _tail_non_negative, _head);
+                    ROS_INFO("Turning off LEDs %d to %d", _tail_non_negative_old, _tail_non_negative);
+                    m_led->setRangeRGBf(0, 0, 0, m_numLeds, _tail_non_negative_old, _tail_non_negative);
+                }
+
+                feedback.current_head_pos = _head;
+                runningBunnyAS.publishFeedback(feedback);
+
+                _head = (_head + goal->skip_leds_per_step) % m_numLeds;
+                _tail = _head - body;
+                _tail_non_negative_old = _tail_non_negative-1;
+            }
+
+            ROS_INFO("circle %d completed", circle);
+        }
+
+        // Test movement for a single LED ("good" range)
+        /*for(int i = 10; i < 200; i++) {
+            m_led->setRangeRGBf(r, g, b, m_numLeds, i-1, i);
+            m_led->setAllRGBf(0, 0, 0, m_numLeds);
+        }*/
+
+        m_led->setAllRGBf(0, 0, 0, m_numLeds);
+        feedback.current_head_pos = head;
+        runningBunnyAS.publishFeedback(feedback);
+        result.current_head_pos = head;
+        runningBunnyAS.setSucceeded(result);
+    }
+
     /**
      * @brief runningBunnyCallback processes RunningBunnyGoal messages - a given stripe of LEDs (bunny) "jumps" in circle (a jump is defined as the number of LEDs that are skipped by the bunny); previous name: lightActionCallback_6 with argument std_msgs::Float32MultiArray::ConstPtr&
      * @param goal
      */
-    void runningBunnyCallback(const iirob_led::RunningBunnyGoal::ConstPtr& goal) {
+    /* OLD VERSION
+     void runningBunnyCallback(const iirob_led::RunningBunnyGoal::ConstPtr& goal) {
         // TODO Use modulo to create a neat transition between previous and next circle!
         // TODO Change RGB values logarithmic
         ROS_INFO("RUNNING BUNNY CALLBACK");
@@ -534,7 +524,7 @@ public:
         int jumpOver = goal->skip_leds_per_step;
 
         if(!head) head = 1;
-        if(!body) body = 1;
+        if(!body) body = 1; // Bunny consists of a single LED
         if(jumpOver <= 0) jumpOver = (int)body/2;
 
         int j;
@@ -582,7 +572,116 @@ public:
         //m_led->setAllRGBf(0, 0, 0, m_numLeds);
         result.current_head_pos = head;
         runningBunnyAS.setSucceeded(result);
-    }
+    }*/
+
+    // TODO Add bidirectional movement - right now the bunny can run only from 0 to 422 (or similar values) but not the other way around.
+    //      The head and body can be used in order to determine in which direction the bunny has to run. If the tail's position < head's position
+    //      then the bunny has to run from 0 to 422 (or similar values) otherwise it has to run from 422 to 0 (or similar values)
+//    void runningBunnyCallback(const iirob_led::RunningBunnyGoal::ConstPtr& goal) {
+//        // TODO Use modulo to create a neat transition between previous and next circle!
+//        // TODO Change RGB values using the routine from Changeling
+//        ROS_INFO("RUNNING BUNNY CALLBACK");
+//        iirob_led::RunningBunnyFeedback feedback;
+//        iirob_led::RunningBunnyResult result;
+//        int circle_counter = goal->num_circles;
+//        int head = goal->head;
+//        int body = goal->body;
+//        int jumpOver = goal->skip_leds_per_step;
+//        float r = goal->color.r;
+//        float g = goal->color.g;
+//        float b = goal->color.b;
+
+//        // The bunny has a minimal size of 2 LEDs
+//        if(!head) head = 1;
+//        if(!body) body = 1; // Bunny consists of a single LED
+//        if(jumpOver <= 0) jumpOver = (int)body/2;
+
+//        int tail = head - body;     // NOTE See bidirectional movement todo. This here will determine which way the bunny has to run
+
+//        ROS_INFO("Head: %d\nBody: %d\nTail: %d", head, body, tail);
+//        // We cut the bunny into two parts (as cruel as it may sound...). The is used when we do the 422->0 transition
+//        // Split in two intervals - (headSplit_start : headSplit_end) splitPos (tailSplit_start : tailSplit_end) with split = LED at position 0
+
+//        // Formular for determining the LED position where we do the split:
+//        // if we reach 422->0 transtition activate split
+//        // for each head++ incr
+
+//        //ROS_INFO("Bunny split: head[%d - %d] | tail[%d - %d]", headSplit_start, headSplit_end, tailSplit_start, tailSplit_end);
+
+//        m_led->setAllRGBf(0, 0, 0, m_numLeds);
+
+//        for(int i = 0; i < circle_counter; ++i) {
+//            int _head = head;
+//            int _tail = _head - body;
+//            bool activateSplit = false;
+//            int headSplit_end = 0;
+//            int tailSplit_start = m_numLeds-1;
+//            int _tail_old = _tail;
+
+//            ROS_INFO("Circle %d", circle_counter);
+
+//            for(int distance = 0; distance < m_numLeds; distance+=jumpOver, _head = (_head + jumpOver) % m_numLeds) {
+//                ROS_INFO("Bunny has ran %d out of %d LEDs so far", distance, m_numLeds-1);
+//                _tail = _head - body;
+//                ROS_INFO("Tail: %d", _tail+(m_numLeds-1));
+
+//                // Whenever _tail is negative (meaning: head has passed the 0 position but the body is still behind the 0 mark)
+//                if(_tail < 0) {
+//                    activateSplit = true;
+//                }
+
+//                if(activateSplit) {
+//                    ROS_INFO("Split active");
+//                    _tail = _tail + m_numLeds;
+
+//                    m_led->setRangeRGBf(r, g, b, m_numLeds, headSplit_end, _head);
+//                    m_led->setRangeRGBf(0, 0, 0, m_numLeds, _head, _tail);
+//                    m_led->setRangeRGBf(r, g, b, m_numLeds, _tail, tailSplit_start);
+//                /*
+//                 * Example:
+//                 * Head on position 1, body length 8 (tail = 417)
+//                 *
+//                 *                      splitPos
+//                 *                    (headSplit_end)    tailSplit_start
+//                 *                          |                   |
+//                 *  headSplit_start         |                   |   tailSplit_end             [x] = head/tail, (0) = splitPos = headSplit_end
+//                 *      |                   |                   |         |
+//                 *  <head[1]><body        [(0)]              [422] : <tail[417]>>            [1]    (0)     422     421     420     419     418     [417]
+//                 *  <head[2]><body[1]      (0)               [422] : <tail[418]>>            [2]     1      (0)     422     421     420     419     [418]
+//                 *  <head[3]><body[2] : [1](0)               [422] : <tail[419]>>            [3]     2       1      (0)     422     421     420     [419]
+//                 *  <head[4]><body[3] : [1](0)               [422] : <tail[420]>>            [4]     3       2      1       (0)     422     421     [420]
+//                 *  <head[5]><body[4] : [1](0)               [422] : <tail[421]>>            [5]     4       3      2        1      (0)     422     [421]
+//                 *  <head[6]><body[5] : [1](0)               [422] : <tail[422]>>            [6]     5       4      3        2       1      (0)     [422]
+//                 *  <head[6]><body[5] :                              <tail[0]>>              [6]     5       4      3        2       1      [0]            <----- splitting OFF
+//                 */
+//                    ROS_INFO("Split state : head[%d] - headSplit_end[%d] - tailSplit_start[%d] - tail[%d]", _head, headSplit_end, tailSplit_start, _tail);
+//                } else {
+//                    //m_led->setRangeRGBf(r, g, b, m_numLeds, _head, _tail);
+//                    m_led->setRangeRGBf(r, g, b, m_numLeds, _tail, _head);
+//                    m_led->setRangeRGBf(0, 0, 0, m_numLeds, _tail-_tail_old, _tail);
+//                    ROS_INFO("Tail(old): %d", _tail_old);
+//                    ROS_INFO("Tail(new): %d", _tail);
+//                    _tail_old = _tail;
+//                    ROS_INFO("Normal state: head[%d] - tail[%d]", _head, _tail);
+//                }
+
+//                // The tail goes from 422 to 0
+//                //if(!(_tail % (m_numLeds-1))) activateSplit = false;
+//                if(_tail == (m_numLeds-1)) {
+//                    m_led->setAllRGBf(0,0,0, m_numLeds);
+//                    activateSplit = false;
+//                }
+
+//                feedback.current_head_pos = _head;
+//                runningBunnyAS.publishFeedback(feedback);
+//            }
+//        }
+
+//        m_led->setAllRGBf(0, 0, 0, m_numLeds);
+//        result.current_head_pos = head;
+//        runningBunnyAS.setSucceeded(result);
+
+//    }
 
     // TODO Maybe expand this to be similar to blinky - support N number of cycles
     /**

@@ -58,12 +58,12 @@ namespace iirob_hardware {
 		/** Returns RGB for hue value [0,1] (S,V = 1.0) */
 		std::vector<float> hueToRGB(float hue);
 
-	/** Methods for modifying individual parts of the strip */
-    bool setXRangeRGB(unsigned char* rgb, int totNumLeds, int start_led, int end_led, bool log=false);
-	/** Set RGB value of all leds */
-    bool setRangeRGB(unsigned char red, unsigned char green, unsigned char blue, int totNumLeds, int start_led, int end_led, bool log=true);
-	/** As above, float [0.1], opt. logarithmic scaling */
-    bool setRangeRGBf(float red, float green, float blue, int totNumLeds, int start_led, int end_led, bool log=true);
+        /** Methods for modifying individual parts of the strip */
+        bool setXRangeRGB(unsigned char* rgb, int totNumLeds, int start_led, int end_led, bool log=false);
+        /** Set RGB value of all leds */
+        bool setRangeRGB(unsigned char red, unsigned char green, unsigned char blue, int totNumLeds, int start_led, int end_led, bool log=true);
+        /** As above, float [0.1], opt. logarithmic scaling */
+        bool setRangeRGBf(float red, float green, float blue, int totNumLeds, int start_led, int end_led, bool log=true);
 
 
 	private:

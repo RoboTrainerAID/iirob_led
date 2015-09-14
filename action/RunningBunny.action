@@ -6,7 +6,8 @@ std_msgs/ColorRGBA color    # RGB values [0-1] for all LEDs
 ############################################
 int32 head                  # Head of the bunny - starting LED for the strip that represents the bunny
 int32 body                  # Body of the bunny - size of the strip that represents the bunny (excludes the head)
-int32 num_circles           # Number of blinks (1 blink = 1 time on + 1 time off)
+# Example: head at position 5 with body length of 3 means that the bunny is represented by LEDs 5,4,3,2 (1 LED for head + 3 LEDs for body)
+int32 num_circles           # Number of full circles (head to head LED position)
 int32 skip_leds_per_step    # Number of LEDs to jump over (basically this determines how fast the bunny runs)
 ---
 int32 current_head_pos           # Number of blinks left until the goal is completed (change this to some decent feedback)
