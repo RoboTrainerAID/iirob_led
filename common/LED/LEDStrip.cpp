@@ -277,23 +277,38 @@ bool LEDStrip::setXRangeRGB(unsigned char* rgb, int n, int start_led, int end_le
 }
 
 bool LEDStrip::setRangeRGB(unsigned char red, unsigned char green, unsigned char blue, int n, int start_led, int end_led, bool log){
-	if (n*3>sizeof(rgbtemp))
-		return false;
-	for (int i = 0; i<(n*3); i+=3) {
+    //
+    //if (n*3>sizeof(rgbtemp))
+    //	return false;
+
+    /*int mode = 0;
+    int diff = start_led - end_led;
+    if(!diff)               // start_led == end_led (single LED mode: range consists of a single LED) Example: start_led = 20, end_led = 20 -> affected LEDs: [20]
+        mode = 0;
+    else if(diff < 0)       // start_led < end_led  (normal LED mode: range follows the normal indexing of the buffer array) Example: start_led = 20, end_led = 63 -> affected LEDs: [20..63]
+        mode = 1;
+    else                    // start_led > end_led  (reversed LED mode: range follows the reversed indexing of the buffer array) Example: start_led = 63; end_led = 20 -> affected LEDs: [63...num_of_leds] + [0..20]
+        mode = 2;*/
+
+    for (int i = 0; i<(n*3); i+=3) {
 #ifdef THREEWIRE
-		rgbtemp[i]   = green;
-		rgbtemp[i+1] = red;
-		rgbtemp[i+2] = blue;
+        rgbtemp[i]   = green;
+        rgbtemp[i+1] = red;
+        rgbtemp[i+2] = blue;
 #else
-		rgbtemp[i]   = blue;
-		rgbtemp[i+1] = green;
-		rgbtemp[i+2] = red;
+        rgbtemp[i]   = blue;
+        rgbtemp[i+1] = green;
+        rgbtemp[i+2] = red;
 #endif
-	}
+    }
     return setXRangeRGB(rgbtemp, n, start_led, end_led, log);
 }
 
 bool LEDStrip::setRangeRGBf(float red, float green, float blue, int n, int start_led, int end_led, bool log) {
+    // By checking here if the number of LEDs is okay we can skip the extra jump to setRangeRGB() in case the result of this check is false
+    // Note: it doesn't make sense for the given LEDs to exceed the actually present ones
+    if (n*3>sizeof(rgbtemp))
+        return false;
 	return LEDStrip::setRangeRGB((unsigned char)(red*255.0), (unsigned char)(green*255.0),
             (unsigned char)(blue*255.0), n, start_led, end_led, log);
 }

@@ -1,22 +1,36 @@
 #include <ros/ros.h>
 #include <ros/console.h>
-#include "actionlib/server/simple_action_server.h"
+#include <actionlib/server/simple_action_server.h>
 
 //#include "iirob_led/PlayLedAction.h"
-#include "iirob_led/BlinkyAction.h"
-#include "iirob_led/PoliceAction.h"
-#include "iirob_led/FourMusketeersAction.h"
-#include "iirob_led/RunningBunnyAction.h"
-#include "iirob_led/ChangelingAction.h"
-//#include "iirob_led/SpinnerAction.h"
-#include "iirob_led/SetLedDirectory.h"
+#include <iirob_led/BlinkyAction.h>
+#include <iirob_led/PoliceAction.h>
+#include <iirob_led/FourMusketeersAction.h>
+#include <iirob_led/RunningBunnyAction.h>
+#include <iirob_led/ChangelingAction.h>
+//#include "iirob_led/SpinnerAction.h>
+#include <iirob_led/SetLedDirectory.h>
+#include <iirob_led/DirectionWithForce.h>
+#include <RGBConverter.h>
 
 #include <std_msgs/String.h>
 #include <std_msgs/ColorRGBA.h>
+#include <geometry_msgs/Vector3.h>
 
 #include <cmath>
 
-#include <RGBConverter.h>
+#include "LEDStrip.h"
+
+#define QUADRANT_NONE   0   // x = y = 0
+#define QUADRANT_FIRST  1   // 1st quadrant: +x, +y
+#define QUADRANT_SECOND 2   // 2nd quadrant: -x, +y
+#define QUADRANT_THIRD  3   // 3rd quadrant: -x, -y
+#define QUADRANT_FOURTH 4   // 4th quadrant: +x, -y
+
+#define CORNER_FRONT_LEFT   0
+#define CORNER_BACK_LEFT    108
+#define CORNER_BACK_RIGHT   192
+#define CORNER_FRONT_RIGHT  300
 
 // TODO override - when ready set to false
 // TODO directoryCallback, set_led_directory - replace this with a vector (btw it's DIRECTION not directory -_-)
@@ -28,10 +42,32 @@
 // FIXME Currently (and how it was implemented by Ruben) if start_led > end_led things screw up. Easiest workaround is to swap the values if such scenario occurs. More complex solution (but better one)
 //       is to split the given strap in 2 parts (see RunningBunny case where there is an issue when we transit from the last led (423 I think it was) to the first one (0))
 
-#include "LEDStrip.h"
-
 class LEDNode
 {
+    /*
+     * SR2 platform corners and quadrants:
+     *   (3rd quadrant)         (2nd quadrant)
+     * CORNER_BACK_LEFT ----- CORNER_FRONT_LEFT
+     *         |                       |
+     *         |           x           |_____________[key switch]
+     *         |    (none quadrant)    |
+     *         |                       |
+     * CORNER_BACK_RIGHT ---- CORNER_FRONT_RIGHT
+     *   (4th quadrant)         (1st quadrant)
+     */
+    /*typedef const int8_t QUADRANT;
+    QUADRANT QUADRANT_NONE;     // x = y = 0
+    QUADRANT QUADRANT_FIRST;    // 1st quadrant: +x, +y
+    QUADRANT QUADRANT_SECOND;   // 2nd quadrant: -x, +y
+    QUADRANT QUADRANT_THIRD;    // 3rd quadrant: -x, -y
+    QUADRANT QUADRANT_FOURTH;   // 4th quadrant: +x, -y*/
+
+    /*typedef const int8_t CORNER;
+    CORNER CORNER_FRONT_LEFT, CORNER_BACK_LEFT, CORNER_BACK_RIGHT, CORNER_FRONT_RIGHT;*/
+
+    const int MAX_FORCE;   // defines the maximum number of LEDs that can be lit (currently set to 10). If changed don't forget to redefine the corners to fit the new bounds
+
+
     int m_msec;
     int m_numLeds;
     iirob_hardware::LEDStrip* m_led;
@@ -39,12 +75,13 @@ class LEDNode
     bool status;        // Contains the return result from init()
     std::string port;
     int num;
+    //              Subsciber:             Topic:                       Data format:                    What it does:
+    ros::Subscriber subLedCommand;      // led_command                  std_msgs/String                 Turns of all LEDs if "off" is received
+    ros::Subscriber subChosenDir;       // chosen_directory             std_msgs/String                 Sets the LED direction that is to be lit (???)
+    ros::Subscriber subLedColor;        // led_color                    std_msgs/ColorRGBA              Sets the LED direction that is to be lit (???)
+    ros::Subscriber subForce;           // led_force                    iirob_led/DirectionWithForce    Takes x and y coordinates, calculates the force (length of the vector) and uses the LEDs to show the direction and magnitude of that force on the XY plane of the SR2
 
-    ros::Subscriber subLedCommand;
-    ros::Subscriber subChosenDir;
-    ros::Subscriber subLedColor;
-
-    ros::ServiceServer set_led_directory_srv;
+    ros::ServiceServer set_led_direction_srv;
 
     actionlib::SimpleActionServer<iirob_led::BlinkyAction> blinkyAS;
     actionlib::SimpleActionServer<iirob_led::PoliceAction> policeAS;
@@ -88,20 +125,26 @@ public:
           policeAS(nodeHandle, "police", boost::bind(&LEDNode::policeCallback, this, _1), false),
           fourMusketeersAS(nodeHandle, "four_musketeers", boost::bind(&LEDNode::fourMusketeersCallback, this, _1), false),
           runningBunnyAS(nodeHandle, "running_bunny", boost::bind(&LEDNode::runningBunnyCallback, this, _1), false),
-          changelingAS(nodeHandle, "changeling", boost::bind(&LEDNode::changelingCallback, this, _1), false)
-          //spinnerAS(nodeHandle, "spinner", boost::bind(&LEDNode::spinnerCallback, this, _1), false)
+          changelingAS(nodeHandle, "changeling", boost::bind(&LEDNode::changelingCallback, this, _1), false),
+          //spinnerAS(nodeHandle, "spinner", boost::bind(&LEDNode::spinnerCallback, this, _1), false),
+          MAX_FORCE(10)
+          //QUADRANT_NONE(0), QUADRANT_FIRST(1), QUADRANT_SECOND(2), QUADRANT_THIRD(3), QUADRANT_FOURTH(4),
+          //CORNER_FRONT_LEFT(0), CORNER_BACK_LEFT(100), CORNER_BACK_RIGHT(192), CORNER_FRONT_RIGHT(300)
     {
         status = init(port, num);
 
-        if(status)
-        {
-            subLedCommand = nodeHandle.subscribe("led_command", 10, &LEDNode::commandCallback, this);
-            subChosenDir = nodeHandle.subscribe("chosen_directory", 10, &LEDNode::ledDirectionCallback, this);
-            subLedColor = nodeHandle.subscribe("led_color", 10, &LEDNode::colorCallback, this);
-
-            set_led_directory_srv = nodeHandle.advertiseService("set_led_directory", &LEDNode::setLedDirection, this);
-            ROS_INFO("%s: IIROB-LED directory set to %s", ros::this_node::getName().c_str(), set_led_directory_srv.getService().c_str());
+        if(!status) {
+            ROS_ERROR("Initiating port %s with number %d failed!", port.c_str(), num);
+            return;
         }
+
+        subLedCommand = nodeHandle.subscribe("led_command", 10, &LEDNode::commandCallback, this);
+        subChosenDir = nodeHandle.subscribe("chosen_directory", 10, &LEDNode::ledDirectionCallback, this);  // FIXME change to chosen_direction
+        subLedColor = nodeHandle.subscribe("led_color", 10, &LEDNode::colorCallback, this);
+        subForce = nodeHandle.subscribe("led_force", 10, &LEDNode::forceCallback, this);
+
+        set_led_direction_srv = nodeHandle.advertiseService("set_led_directory", &LEDNode::setLedDirection, this);  // FIXME change to set_led_direction
+        ROS_INFO("%s: IIROB-LED directory set to %s", ros::this_node::getName().c_str(), set_led_direction_srv.getService().c_str());
     }
 
 	//! Destructor.
@@ -125,8 +168,9 @@ public:
         subLedCommand.shutdown();
         subChosenDir.shutdown();
         subLedColor.shutdown();
+        subForce.shutdown();
 
-        set_led_directory_srv.shutdown();
+        set_led_direction_srv.shutdown();
     }
 
     bool getStatus() { return status; }
@@ -172,8 +216,8 @@ public:
 		//m_led->setAllRGBf(msg->r, msg->g, msg->b, m_numLeds);
 	}
 
-    void ledDirectionCallback(const std_msgs::String::ConstPtr& msg) {
-        std::string tempMsg = msg->data.c_str();
+    void ledDirectionCallback(const std_msgs::String::ConstPtr& led_direction_msg) {
+        std::string tempMsg = led_direction_msg->data.c_str();
 
         if (tempMsg == "r") {       // right
             m_showDir = 0;
@@ -230,6 +274,102 @@ public:
         m_led->setRangeRGBf(req.color.r, req.color.g, req.color.b, m_numLeds, req.start_led, req.end_led);
         return true;
     }
+
+    void forceCallback(const iirob_led::DirectionWithForce::ConstPtr& led_force_msg) {
+        // Calculate the force
+        double x = led_force_msg->force.x;
+        double y = led_force_msg->force.y;
+        double force = sqrt(pow(led_force_msg->force.x, 2) + pow(led_force_msg->force.y, 2) + pow(led_force_msg->force.z, 2));
+        // Scale the received force to be in the interval between 0 and maxForce (maxFroce rounded up and converted to an integer - it will represent the number of LEDs to be lit)
+        // [0] ----- [force] -- [maxForce]
+        int forceRounded = (int)ceil(force);   // 1.5 becomes 2.0 and then 2
+        ROS_INFO("Max force: %d", MAX_FORCE);
+        ROS_INFO("Force: %.3f | Rounded and int: %d", force, forceRounded);
+        if(forceRounded > MAX_FORCE) {
+            ROS_ERROR("Received force is of greater magnitude than the set upper bound or exceed the numer of LEDs that can be displayed on each side of the platform | forceRounded(%d), forceMax(%d)", forceRounded, MAX_FORCE);
+            return;
+        }
+
+        // Determine quadrant and corner that will display the force
+        int8_t quadrant;
+        int corner;
+        // TODO Test for case such as x^2 + y^2 + z^2 > 0 and < 1- Should such cases be excluded or the minimal force that can be displayed is 1? Right now I'm ceiling the force hence 0.1 ~ 0.2 ... ~ 0.9 ~ 1.0
+        if((x >= 0 && y > 0) || (x > 0 && y >= 0)) quadrant = QUADRANT_FIRST;
+        else if(x < 0 && y >= 0) quadrant = QUADRANT_SECOND;
+        else if(x < 0 && y < 0) quadrant = QUADRANT_THIRD;
+        else if(x >= 0 && y < 0) quadrant = QUADRANT_FOURTH;
+        else quadrant = QUADRANT_NONE;  // x = y = 0
+        ROS_INFO("XY coordinates: [%.3f , %.3f] (quadrant %d)\t|\tForce (upper limit of %d): %.3f", x, y, quadrant, MAX_FORCE, force);
+        switch(quadrant) {
+        case QUADRANT_NONE:
+            // If X and Y are equal to 0 we cannot determine the corner hence no point in displaying anything
+            return;
+        case QUADRANT_FIRST:
+            corner = CORNER_FRONT_RIGHT;
+            break;
+        case QUADRANT_SECOND:
+            corner = CORNER_FRONT_LEFT;
+            break;
+        case QUADRANT_THIRD:
+            corner = CORNER_BACK_LEFT;
+            break;
+        case QUADRANT_FOURTH:
+            corner = CORNER_BACK_RIGHT;
+            break;
+        }
+
+        /*
+         * Corner:
+         *
+         *                corner------[forceRoundend]
+         *                  |
+         *                  |
+         *                  |
+         *           [forceRoundend]
+         */
+        switch(corner) {
+        case CORNER_FRONT_RIGHT:
+            // Example: forceRounded = 5, CORNER_FRONT_RIGHT = 300
+            // From 300 - 5 = 255 to 299 [LEDs: 255, 296, 297, 298, 299]
+            // From 300 to 300 + 4 = 304 [LEDs: 300, 301, 302, 303, 304]
+            m_led->setRangeRGBf(1, 0, 0, m_numLeds, corner-forceRounded, corner);
+            ROS_INFO("Corner: front right | from %d to %d", corner-forceRounded, corner);
+            m_led->setRangeRGBf(0, 0, 1, m_numLeds, corner, corner+forceRounded);
+            ROS_INFO("Corner: front right | from %d to %d", corner, corner+forceRounded);
+            break;
+        case CORNER_FRONT_LEFT:
+            // FIXME Same issue as with the RunningBunny - going from 422 to 0 causes only the 0..x to be displayed
+            m_led->setRangeRGBf(0, 0, 1, m_numLeds, corner, corner+forceRounded);
+            ROS_INFO("Corner: front left | from %d to %d", corner, corner+forceRounded);
+            m_led->setRangeRGBf(1, 0, 0, m_numLeds, m_numLeds-forceRounded, m_numLeds-1);
+            ROS_INFO("Corner: front left | from %d to %d", m_numLeds-forceRounded, m_numLeds-1);
+            break;
+        case CORNER_BACK_LEFT:
+            m_led->setRangeRGBf(1, 0, 0, m_numLeds, corner-forceRounded, corner);
+            ROS_INFO("Corner: back left | from %d to %d", corner-forceRounded, corner);
+            m_led->setRangeRGBf(0, 0, 1, m_numLeds, corner, corner+forceRounded);
+            ROS_INFO("Corner: back left | from %d to %d", corner, corner+forceRounded);
+            break;
+        case CORNER_BACK_RIGHT:
+            m_led->setRangeRGBf(1, 0, 0, m_numLeds, corner-forceRounded, corner);
+            ROS_INFO("Corner: back right | from %d to %d", corner-forceRounded, corner);
+            m_led->setRangeRGBf(0, 0, 1, m_numLeds, corner, corner+forceRounded);
+            ROS_INFO("Corner: back right | from %d to %d", corner, corner+forceRounded);
+            break;
+        }
+
+        // Test manually
+        /*m_led->setRangeRGBf(0, 0, 1, m_numLeds, 0, 3);
+        ROS_INFO("Corner: front left | from %d to %d", 0, 3);
+        m_led->setRangeRGBf(1, 0, 0, m_numLeds, 420, 422);
+        ROS_INFO("Corner: front left | from %d to %d", 420, 422);*/
+
+        // Determine which quadrant of the platform the vector is in
+
+
+        ros::Duration(led_force_msg->duration).sleep();
+        m_led->setAllRGBf(0, 0, 0, m_numLeds);
+   }
 
     /**
      * @brief blinkyCallback processes BlinkyActionGoal messages - it turns on and off a give stripe of LEDs; previous name: lightActionCallback_2 with argument std_msgs::Float32MultiArray::ConstPtr&
@@ -577,111 +717,109 @@ public:
     // TODO Add bidirectional movement - right now the bunny can run only from 0 to 422 (or similar values) but not the other way around.
     //      The head and body can be used in order to determine in which direction the bunny has to run. If the tail's position < head's position
     //      then the bunny has to run from 0 to 422 (or similar values) otherwise it has to run from 422 to 0 (or similar values)
-//    void runningBunnyCallback(const iirob_led::RunningBunnyGoal::ConstPtr& goal) {
-//        // TODO Use modulo to create a neat transition between previous and next circle!
-//        // TODO Change RGB values using the routine from Changeling
-//        ROS_INFO("RUNNING BUNNY CALLBACK");
-//        iirob_led::RunningBunnyFeedback feedback;
-//        iirob_led::RunningBunnyResult result;
-//        int circle_counter = goal->num_circles;
-//        int head = goal->head;
-//        int body = goal->body;
-//        int jumpOver = goal->skip_leds_per_step;
-//        float r = goal->color.r;
-//        float g = goal->color.g;
-//        float b = goal->color.b;
+    /*void runningBunnyCallback(const iirob_led::RunningBunnyGoal::ConstPtr& goal) {
+        // TODO Use modulo to create a neat transition between previous and next circle!
+        // TODO Change RGB values using the routine from Changeling
+        ROS_INFO("RUNNING BUNNY CALLBACK");
+        iirob_led::RunningBunnyFeedback feedback;
+        iirob_led::RunningBunnyResult result;
+        int circle_counter = goal->num_circles;
+        int head = goal->head;
+        int body = goal->body;
+        int jumpOver = goal->skip_leds_per_step;
+        float r = goal->color.r;
+        float g = goal->color.g;
+        float b = goal->color.b;
 
-//        // The bunny has a minimal size of 2 LEDs
-//        if(!head) head = 1;
-//        if(!body) body = 1; // Bunny consists of a single LED
-//        if(jumpOver <= 0) jumpOver = (int)body/2;
+        // The bunny has a minimal size of 2 LEDs
+        if(!head) head = 1;
+        if(!body) body = 1; // Bunny consists of a single LED
+        if(jumpOver <= 0) jumpOver = (int)body/2;
 
-//        int tail = head - body;     // NOTE See bidirectional movement todo. This here will determine which way the bunny has to run
+        int tail = head - body;     // NOTE See bidirectional movement todo. This here will determine which way the bunny has to run
 
-//        ROS_INFO("Head: %d\nBody: %d\nTail: %d", head, body, tail);
-//        // We cut the bunny into two parts (as cruel as it may sound...). The is used when we do the 422->0 transition
-//        // Split in two intervals - (headSplit_start : headSplit_end) splitPos (tailSplit_start : tailSplit_end) with split = LED at position 0
+        ROS_INFO("Head: %d\nBody: %d\nTail: %d", head, body, tail);
+        // We cut the bunny into two parts (as cruel as it may sound...). The is used when we do the 422->0 transition
+        // Split in two intervals - (headSplit_start : headSplit_end) splitPos (tailSplit_start : tailSplit_end) with split = LED at position 0
 
-//        // Formular for determining the LED position where we do the split:
-//        // if we reach 422->0 transtition activate split
-//        // for each head++ incr
+        // Formular for determining the LED position where we do the split:
+        // if we reach 422->0 transtition activate split
+        // for each head++ incr
 
-//        //ROS_INFO("Bunny split: head[%d - %d] | tail[%d - %d]", headSplit_start, headSplit_end, tailSplit_start, tailSplit_end);
+        //ROS_INFO("Bunny split: head[%d - %d] | tail[%d - %d]", headSplit_start, headSplit_end, tailSplit_start, tailSplit_end);
 
-//        m_led->setAllRGBf(0, 0, 0, m_numLeds);
+        m_led->setAllRGBf(0, 0, 0, m_numLeds);
 
-//        for(int i = 0; i < circle_counter; ++i) {
-//            int _head = head;
-//            int _tail = _head - body;
-//            bool activateSplit = false;
-//            int headSplit_end = 0;
-//            int tailSplit_start = m_numLeds-1;
-//            int _tail_old = _tail;
+        for(int i = 0; i < circle_counter; ++i) {
+            int _head = head;
+            int _tail = _head - body;
+            bool activateSplit = false;
+            int headSplit_end = 0;
+            int tailSplit_start = m_numLeds-1;
+            int _tail_old = _tail;
 
-//            ROS_INFO("Circle %d", circle_counter);
+            ROS_INFO("Circle %d", circle_counter);
 
-//            for(int distance = 0; distance < m_numLeds; distance+=jumpOver, _head = (_head + jumpOver) % m_numLeds) {
-//                ROS_INFO("Bunny has ran %d out of %d LEDs so far", distance, m_numLeds-1);
-//                _tail = _head - body;
-//                ROS_INFO("Tail: %d", _tail+(m_numLeds-1));
+            for(int distance = 0; distance < m_numLeds; distance+=jumpOver, _head = (_head + jumpOver) % m_numLeds) {
+                ROS_INFO("Bunny has ran %d out of %d LEDs so far", distance, m_numLeds-1);
+                _tail = _head - body;
+                ROS_INFO("Tail: %d", _tail+(m_numLeds-1));
 
-//                // Whenever _tail is negative (meaning: head has passed the 0 position but the body is still behind the 0 mark)
-//                if(_tail < 0) {
-//                    activateSplit = true;
-//                }
+                // Whenever _tail is negative (meaning: head has passed the 0 position but the body is still behind the 0 mark)
+                if(_tail < 0) {
+                    activateSplit = true;
+                }
 
-//                if(activateSplit) {
-//                    ROS_INFO("Split active");
-//                    _tail = _tail + m_numLeds;
+                if(activateSplit) {
+                    ROS_INFO("Split active");
+                    _tail = _tail + m_numLeds;
 
-//                    m_led->setRangeRGBf(r, g, b, m_numLeds, headSplit_end, _head);
-//                    m_led->setRangeRGBf(0, 0, 0, m_numLeds, _head, _tail);
-//                    m_led->setRangeRGBf(r, g, b, m_numLeds, _tail, tailSplit_start);
-//                /*
-//                 * Example:
-//                 * Head on position 1, body length 8 (tail = 417)
-//                 *
-//                 *                      splitPos
-//                 *                    (headSplit_end)    tailSplit_start
-//                 *                          |                   |
-//                 *  headSplit_start         |                   |   tailSplit_end             [x] = head/tail, (0) = splitPos = headSplit_end
-//                 *      |                   |                   |         |
-//                 *  <head[1]><body        [(0)]              [422] : <tail[417]>>            [1]    (0)     422     421     420     419     418     [417]
-//                 *  <head[2]><body[1]      (0)               [422] : <tail[418]>>            [2]     1      (0)     422     421     420     419     [418]
-//                 *  <head[3]><body[2] : [1](0)               [422] : <tail[419]>>            [3]     2       1      (0)     422     421     420     [419]
-//                 *  <head[4]><body[3] : [1](0)               [422] : <tail[420]>>            [4]     3       2      1       (0)     422     421     [420]
-//                 *  <head[5]><body[4] : [1](0)               [422] : <tail[421]>>            [5]     4       3      2        1      (0)     422     [421]
-//                 *  <head[6]><body[5] : [1](0)               [422] : <tail[422]>>            [6]     5       4      3        2       1      (0)     [422]
-//                 *  <head[6]><body[5] :                              <tail[0]>>              [6]     5       4      3        2       1      [0]            <----- splitting OFF
-//                 */
+                    m_led->setRangeRGBf(r, g, b, m_numLeds, headSplit_end, _head);
+                    m_led->setRangeRGBf(0, 0, 0, m_numLeds, _head, _tail);
+                    m_led->setRangeRGBf(r, g, b, m_numLeds, _tail, tailSplit_start);
+
+//                   Example:
+//                   Head on position 1, body length 8 (tail = 417)
+//                                       splitPos
+//                                     (headSplit_end)    tailSplit_start
+//                                           |                   |
+//                   headSplit_start         |                   |   tailSplit_end             [x] = head/tail, (0) = splitPos = headSplit_end
+//                       |                   |                   |         |
+//                   <head[1]><body        [(0)]              [422] : <tail[417]>>            [1]    (0)     422     421     420     419     418     [417]
+//                   <head[2]><body[1]      (0)               [422] : <tail[418]>>            [2]     1      (0)     422     421     420     419     [418]
+//                   <head[3]><body[2] : [1](0)               [422] : <tail[419]>>            [3]     2       1      (0)     422     421     420     [419]
+//                   <head[4]><body[3] : [1](0)               [422] : <tail[420]>>            [4]     3       2      1       (0)     422     421     [420]
+//                   <head[5]><body[4] : [1](0)               [422] : <tail[421]>>            [5]     4       3      2        1      (0)     422     [421]
+//                   <head[6]><body[5] : [1](0)               [422] : <tail[422]>>            [6]     5       4      3        2       1      (0)     [422]
+//                   <head[6]><body[5] :                              <tail[0]>>              [6]     5       4      3        2       1      [0]            <----- splitting OFF
 //                    ROS_INFO("Split state : head[%d] - headSplit_end[%d] - tailSplit_start[%d] - tail[%d]", _head, headSplit_end, tailSplit_start, _tail);
-//                } else {
-//                    //m_led->setRangeRGBf(r, g, b, m_numLeds, _head, _tail);
-//                    m_led->setRangeRGBf(r, g, b, m_numLeds, _tail, _head);
-//                    m_led->setRangeRGBf(0, 0, 0, m_numLeds, _tail-_tail_old, _tail);
-//                    ROS_INFO("Tail(old): %d", _tail_old);
-//                    ROS_INFO("Tail(new): %d", _tail);
-//                    _tail_old = _tail;
-//                    ROS_INFO("Normal state: head[%d] - tail[%d]", _head, _tail);
-//                }
+                } else {
+                    //m_led->setRangeRGBf(r, g, b, m_numLeds, _head, _tail);
+                    m_led->setRangeRGBf(r, g, b, m_numLeds, _tail, _head);
+                    m_led->setRangeRGBf(0, 0, 0, m_numLeds, _tail-_tail_old, _tail);
+                    ROS_INFO("Tail(old): %d", _tail_old);
+                    ROS_INFO("Tail(new): %d", _tail);
+                    _tail_old = _tail;
+                    ROS_INFO("Normal state: head[%d] - tail[%d]", _head, _tail);
+                }
 
-//                // The tail goes from 422 to 0
-//                //if(!(_tail % (m_numLeds-1))) activateSplit = false;
-//                if(_tail == (m_numLeds-1)) {
-//                    m_led->setAllRGBf(0,0,0, m_numLeds);
-//                    activateSplit = false;
-//                }
+                // The tail goes from 422 to 0
+                //if(!(_tail % (m_numLeds-1))) activateSplit = false;
+                if(_tail == (m_numLeds-1)) {
+                    m_led->setAllRGBf(0,0,0, m_numLeds);
+                    activateSplit = false;
+                }
 
-//                feedback.current_head_pos = _head;
-//                runningBunnyAS.publishFeedback(feedback);
-//            }
-//        }
+                feedback.current_head_pos = _head;
+                runningBunnyAS.publishFeedback(feedback);
+            }
+        }
 
-//        m_led->setAllRGBf(0, 0, 0, m_numLeds);
-//        result.current_head_pos = head;
-//        runningBunnyAS.setSucceeded(result);
+        m_led->setAllRGBf(0, 0, 0, m_numLeds);
+        result.current_head_pos = head;
+        runningBunnyAS.setSucceeded(result);
 
-//    }
+    }*/
 
     // TODO Maybe expand this to be similar to blinky - support N number of cycles
     /**
@@ -751,6 +889,8 @@ public:
 
     void spin() { ros::spin(); }
 };
+
+//const int LEDNode::MAX_FORCE = 10;
 
 int main(int argc, char **argv)
 {
