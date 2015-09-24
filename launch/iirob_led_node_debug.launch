@@ -1,0 +1,14 @@
+<?xml version="1.0"?>
+<launch>
+    <arg name="port" default="/dev/ttyUSB0" />
+<!--    <arg name="led_num" value="423" default="1" /> -->
+    <arg name="led_num" value="423" />
+    <arg name="override" default="true" />
+
+    <node name="leds" pkg="iirob_led" type="iirob_led_node" output="screen" launch-prefix="gdbserver localhost:1234">
+        <param name="port" value="$(arg port)" />
+        <param name="led_num" value="$(arg led_num)" />
+        <param name="override" value="$(arg override)" />
+    </node>
+
+</launch>
