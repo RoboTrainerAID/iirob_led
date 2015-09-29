@@ -4,6 +4,9 @@ project(iirob_led)
 #TODO Remove when testing is done
 set(CMAKE_BUILD_TYPE Debug)
 
+SET(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS} -fPIC"  )
+SET(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_DEBUG} -Wall -s -O3 -g0"  )
+
 find_package(catkin REQUIRED COMPONENTS
   actionlib
   actionlib_msgs
