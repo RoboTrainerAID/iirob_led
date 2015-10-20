@@ -6,9 +6,10 @@
 std_msgs/ColorRGBA color    # RGB values [0-1] for all LEDs
 int32 start_led             # First LED in the stripe where LEDs will blink
 int32 end_led               # Last LED in the stripe where LEDs will blink
-float64 step                # Defines granularity of the value (HSV) for a given RGB color; it also influences the speed since step determines how many steps a cycle contains
-float64 time_between_steps  # Defines the transition speed between steps (default: 0.1; maximum: 0.5; minimum (see warning below): 0.001 due to restrictions what the eye can actually register when it comes to changing the value of a color and the large number of steps for per cycle
-float64 duration            # Overrides time_between_step
+int32 cycles                # Number of cycles
+#float64 step               # Defines granularity of the value (HSV) for a given RGB color; it also influences the speed since step determines how many steps a cycle contains
+#float64 time_between_steps # Defines the transition speed between steps (default: 0.1; maximum: 0.5; minimum (see warning below): 0.001 due to restrictions what the eye can actually register when it comes to changing the value of a color and the large number of steps for per cycle
+float64 duration_of_cycle   # Overrides time_between_step
 # WARNING: Transition speed between steps is also restricted by how fast a single loop cycle is processed!
 
 # Example for a neat looking cycle: step=0.1, time_between_steps=0.001

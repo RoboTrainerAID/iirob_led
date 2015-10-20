@@ -3,7 +3,7 @@
 
     <arg name="port" default="/dev/ttyUSB0" />
 <!--    <arg name="led_num" value="423" default="1" /> -->
-    <arg name="led_num" value="423" />
+    <arg name="led_num" value="384" />
     <arg name="override" default="true" />
 
     <node name="leds" pkg="iirob_led" type="iirob_led_node" output="screen">

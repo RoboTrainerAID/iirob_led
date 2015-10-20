@@ -1,8 +1,8 @@
-std_msgs/ColorRGBA color1    # RGB values [0-1] for Athos
-std_msgs/ColorRGBA color2    # RGB values [0-1] for Porthos
-std_msgs/ColorRGBA color3    # RGB values [0-1] for Aramis
-std_msgs/ColorRGBA color4    # RGB values [0-1] for D'Artagnan
-int32  blinks               # Number of blinks (1 blink = 1 time on + 1 time off)
+std_msgs/ColorRGBA color1    # RGB values [0-1] for region 1
+std_msgs/ColorRGBA color2    # RGB values [0-1] for region 2
+std_msgs/ColorRGBA color3    # RGB values [0-1] for region 3
+std_msgs/ColorRGBA color4    # RGB values [0-1] for region 4
+int32  blinks                # Number of blinks (1 blink = 1 time on + 1 time off)
 float32 duration_on          # in [s]
 float32 duration_off         # in [s]
 int32 start_led             # First LED in the stripe where LEDs will blink

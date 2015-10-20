@@ -5,9 +5,9 @@
 //#include "iirob_led/PlayLedAction.h"
 #include <iirob_led/BlinkyAction.h>
 #include <iirob_led/PoliceAction.h>
-#include <iirob_led/FourMusketeersAction.h>
-#include <iirob_led/RunningBunnyAction.h>
-#include <iirob_led/ChangelingAction.h>
+#include <iirob_led/FourRegionsAction.h>
+#include <iirob_led/ChaserLightAction.h>
+//#include <iirob_led/ChangelingAction.h>
 //#include "iirob_led/SpinnerAction.h>
 #include <iirob_led/SetLedDirectory.h>
 #include <iirob_led/DirectionWithForce.h>
@@ -27,6 +27,8 @@
 #define QUADRANT_THIRD  3   // 3rd quadrant: -x, -y
 #define QUADRANT_FOURTH 4   // 4th quadrant: +x, -y
 
+// FIXME #LEDs - 384 (last LED not lit)
+// Ruben -> take his caluclations for the LEDs
 #define CORNER_FRONT_LEFT   0
 #define CORNER_BACK_LEFT    108
 #define CORNER_BACK_RIGHT   192
@@ -41,7 +43,6 @@
 // NOTE Except for color values (ColorRGBA requires float) use double (float64 in ROS) for more accuracy
 // FIXME Currently (and how it was implemented by Ruben) if start_led > end_led things screw up. Easiest workaround is to swap the values if such scenario occurs. More complex solution (but better one)
 //       is to split the given strap in 2 parts (see RunningBunny case where there is an issue when we transit from the last led (423 I think it was) to the first one (0))
-
 class LEDNode
 {
     /*
@@ -76,18 +77,18 @@ class LEDNode
     std::string port;
     int num;
     //              Subsciber:             Topic:                       Data format:                    What it does:
-    ros::Subscriber subLedCommand;      // led_command                  std_msgs/String                 Turns of all LEDs if "off" is received
-    ros::Subscriber subChosenDir;       // chosen_directory             std_msgs/String                 Sets the LED direction that is to be lit (???)
-    ros::Subscriber subLedColor;        // led_color                    std_msgs/ColorRGBA              Sets the LED direction that is to be lit (???)
+//    ros::Subscriber subLedCommand;      // led_command                  std_msgs/String                 Turns of all LEDs if "off" is received
+//    ros::Subscriber subChosenDir;       // chosen_directory             std_msgs/String                 Sets the LED direction that is to be lit (???)
+//    ros::Subscriber subLedColor;        // led_color                    std_msgs/ColorRGBA              Sets the LED direction that is to be lit (???)
     ros::Subscriber subForce;           // led_force                    iirob_led/DirectionWithForce    Takes x and y coordinates, calculates the force (length of the vector) and uses the LEDs to show the direction and magnitude of that force on the XY plane of the SR2
 
-    ros::ServiceServer set_led_direction_srv;
+//    ros::ServiceServer set_led_direction_srv;
 
     actionlib::SimpleActionServer<iirob_led::BlinkyAction> blinkyAS;
     actionlib::SimpleActionServer<iirob_led::PoliceAction> policeAS;
-    actionlib::SimpleActionServer<iirob_led::FourMusketeersAction> fourMusketeersAS;
-    actionlib::SimpleActionServer<iirob_led::RunningBunnyAction> runningBunnyAS;
-    actionlib::SimpleActionServer<iirob_led::ChangelingAction> changelingAS;
+    actionlib::SimpleActionServer<iirob_led::FourRegionsAction> fourRegionsAS;
+    actionlib::SimpleActionServer<iirob_led::ChaserLightAction> chaserLightAS;
+    //actionlib::SimpleActionServer<iirob_led::ChangelingAction> changelingAS;
     //actionlib::SimpleActionServer<iirob_led::SpinnerAction> spinnerAS;
 
     bool init(std::string const & port, int const & num) {
@@ -105,27 +106,28 @@ class LEDNode
             ROS_INFO("blinky");
             policeAS.start();
             ROS_INFO("police");
-            fourMusketeersAS.start();
+            fourRegionsAS.start();
             ROS_INFO("fourMusketeers");
-            runningBunnyAS.start();
+            chaserLightAS.start();
             ROS_INFO("runningBunny");
-            changelingAS.start();
-            ROS_INFO("changeling");
+            //changelingAS.start();
+            //ROS_INFO("changeling");
 
             return true;
         }
         return false;
     }
+
 public:
 	//! Constructor.
     LEDNode(ros::NodeHandle nodeHandle, std::string const& _port, int const& _num)
-        : m_led(0), m_numLeds(423), m_msec(1),
+        : m_led(0), m_msec(1),
           port(_port), num(_num),
           blinkyAS(nodeHandle, "blinky", boost::bind(&LEDNode::blinkyCallback, this, _1), false),
           policeAS(nodeHandle, "police", boost::bind(&LEDNode::policeCallback, this, _1), false),
-          fourMusketeersAS(nodeHandle, "four_musketeers", boost::bind(&LEDNode::fourMusketeersCallback, this, _1), false),
-          runningBunnyAS(nodeHandle, "running_bunny", boost::bind(&LEDNode::runningBunnyCallback, this, _1), false),
-          changelingAS(nodeHandle, "changeling", boost::bind(&LEDNode::changelingCallback, this, _1), false),
+          fourRegionsAS(nodeHandle, "four_regions", boost::bind(&LEDNode::fourRegionsCallback, this, _1), false),
+          chaserLightAS(nodeHandle, "chaser_light", boost::bind(&LEDNode::chaserLightCallback, this, _1), false),
+          //changelingAS(nodeHandle, "changeling", boost::bind(&LEDNode::changelingCallback, this, _1), false),
           //spinnerAS(nodeHandle, "spinner", boost::bind(&LEDNode::spinnerCallback, this, _1), false),
           MAX_FORCE(10)
           //QUADRANT_NONE(0), QUADRANT_FIRST(1), QUADRANT_SECOND(2), QUADRANT_THIRD(3), QUADRANT_FOURTH(4),
@@ -138,13 +140,7 @@ public:
             return;
         }
 
-        subLedCommand = nodeHandle.subscribe("led_command", 10, &LEDNode::commandCallback, this);
-        subChosenDir = nodeHandle.subscribe("chosen_directory", 10, &LEDNode::ledDirectionCallback, this);  // FIXME change to chosen_direction
-        subLedColor = nodeHandle.subscribe("led_color", 10, &LEDNode::colorCallback, this);
         subForce = nodeHandle.subscribe("led_force", 10, &LEDNode::forceCallback, this);
-
-        set_led_direction_srv = nodeHandle.advertiseService("set_led_directory", &LEDNode::setLedDirection, this);  // FIXME change to set_led_direction
-        ROS_INFO("%s: IIROB-LED directory set to %s", ros::this_node::getName().c_str(), set_led_direction_srv.getService().c_str());
     }
 
 	//! Destructor.
@@ -160,120 +156,14 @@ public:
         ROS_INFO("Shutting down all action servers");
         blinkyAS.shutdown();
         policeAS.shutdown();
-        fourMusketeersAS.shutdown();
-        runningBunnyAS.shutdown();
-        changelingAS.shutdown();
-        //spinnerAS.shutdown();
+        fourRegionsAS.shutdown();
+        chaserLightAS.shutdown();
+        //changelingAS.shutdown();
 
-        subLedCommand.shutdown();
-        subChosenDir.shutdown();
-        subLedColor.shutdown();
         subForce.shutdown();
-
-        set_led_direction_srv.shutdown();
     }
 
     bool getStatus() { return status; }
-
-	//! Callback function for subscriber.
-	void commandCallback(const std_msgs::String::ConstPtr& msg) {
-		ROS_INFO("I heard: [%s]", msg->data.c_str());
-		if (msg->data == "off") {
-			m_led->setAllRGBf(0, 0, 0, m_numLeds);
-		}
-	}
-	void colorCallback(const std_msgs::ColorRGBA::ConstPtr& msg) {
-		ROS_INFO("I heard: [%f %f %f %f %d]", msg->r, msg->g, msg->b, msg->a, m_numLeds );
-		ROS_INFO("[%d]", m_showDir);
-		//Entscheidung welche LED-Richtung gezeigt wird
-		switch(m_showDir) {
-			case 0:
-				m_led->setRangeRGBf(msg->r, msg->g, msg->b, m_numLeds, 0, 7);
-				ROS_INFO("A");
-				break;
-			case 1:
-				m_led->setRangeRGBf(msg->r, msg->g, msg->b, m_numLeds, 7, 14);
-				ROS_INFO("B");
-				break;
-			case 2:
-				m_led->setRangeRGBf(msg->r, msg->g, msg->b, m_numLeds, 14, 22);
-				ROS_INFO("C");
-				break;
-			case 3:
-				m_led->setRangeRGBf(msg->r, msg->g, msg->b, m_numLeds, 23, 31);
-				ROS_INFO("D");
-				break;
-			case 4:
-				m_led->setAllRGBf(msg->r, msg->g, msg->b, m_numLeds);
-				ROS_INFO("F");
-				break;
-			default:
-				m_led->setAllRGBf(msg->r, msg->g, msg->b, m_numLeds);
-				ROS_INFO("Default");
-				break;
-		}
-		//Auskommentiert, da Richtungsversion den Fall abdeckt
-		//m_led->setAllRGBf(msg->r, msg->g, msg->b, m_numLeds);
-	}
-
-    void ledDirectionCallback(const std_msgs::String::ConstPtr& led_direction_msg) {
-        std::string tempMsg = led_direction_msg->data.c_str();
-
-        if (tempMsg == "r") {       // right
-            m_showDir = 0;
-        }
-        else if (tempMsg == "l") {  // left
-            m_showDir = 1;
-        }
-        else if (tempMsg == "b") {  // back
-            m_showDir = 2;
-        }
-        else if (tempMsg == "f") {  // front
-            m_showDir = 3;
-        }
-        else {
-            //Default
-            //m_showDir = 4;
-        }
-
-        /*
-         * NOTE See what exactly "chosen_directory" is. From what I see above it seems that it only
-         * contains single character strings and frankly it doesn't make much sense to use complete strings
-         * if that's the case
-         *
-      void directoryCallback(const std_msgs::Char::ConstPtr& msg) {
-        char tempMsg = msg->data;
-
-        switch(tempMsg)
-        {
-        case 'r':
-            m_showDir = 0;
-            break;
-        case 'l':
-            m_showDir = 1;
-            break;
-        case 'b':
-            m_showDir = 2;
-            break;
-        case 'f':
-            m_showDir = 3;
-            break;
-        default:
-            //m_showDir = 4;
-            break;
-        }
-    }
-        */
-	}
-
-    bool setLedDirection(iirob_led::SetLedDirectory::Request &req,
-                           iirob_led::SetLedDirectory::Response &res)
-    {
-        ROS_INFO("I heard: [%f %f %f %f %d %d]",
-                 req.color.r, req.color.g, req.color.b, req.color.a, req.start_led, req.end_led);
-        m_led->setRangeRGBf(req.color.r, req.color.g, req.color.b, m_numLeds, req.start_led, req.end_led);
-        return true;
-    }
 
     void forceCallback(const iirob_led::DirectionWithForce::ConstPtr& led_force_msg) {
         // Calculate the force
@@ -282,7 +172,8 @@ public:
         double force = sqrt(pow(led_force_msg->force.x, 2) + pow(led_force_msg->force.y, 2) + pow(led_force_msg->force.z, 2));
         // Scale the received force to be in the interval between 0 and maxForce (maxFroce rounded up and converted to an integer - it will represent the number of LEDs to be lit)
         // [0] ----- [force] -- [maxForce]
-        int forceRounded = (int)ceil(force);   // 1.5 becomes 2.0 and then 2
+        //int forceRounded = (int)ceil(force);   // 1.5 becomes 2.0 and then 2
+        int forceRounded = (int)round(force);   // 1.5 becomes 2.0 and then 2
         ROS_INFO("Max force: %d", MAX_FORCE);
         ROS_INFO("Force: %.3f | Rounded and int: %d", force, forceRounded);
         if(forceRounded > MAX_FORCE) {
@@ -300,6 +191,7 @@ public:
         else if(x >= 0 && y < 0) quadrant = QUADRANT_FOURTH;
         else quadrant = QUADRANT_NONE;  // x = y = 0
         ROS_INFO("XY coordinates: [%.3f , %.3f] (quadrant %d)\t|\tForce (upper limit of %d): %.3f", x, y, quadrant, MAX_FORCE, force);
+
         switch(quadrant) {
         case QUADRANT_NONE:
             // If X and Y are equal to 0 we cannot determine the corner hence no point in displaying anything
@@ -327,6 +219,8 @@ public:
          *                  |
          *           [forceRoundend]
          */
+
+        // TODO Remove all ROS_INFOs here
         switch(corner) {
         case CORNER_FRONT_RIGHT:
             // Example: forceRounded = 5, CORNER_FRONT_RIGHT = 300
@@ -364,9 +258,6 @@ public:
         m_led->setRangeRGBf(1, 0, 0, m_numLeds, 420, 422);
         ROS_INFO("Corner: front left | from %d to %d", 420, 422);*/
 
-        // Determine which quadrant of the platform the vector is in
-
-
         ros::Duration(led_force_msg->duration).sleep();
         m_led->setAllRGBf(0, 0, 0, m_numLeds);
    }
@@ -381,6 +272,16 @@ public:
         int blinks_left = goal->blinks;
         int start_led = goal->start_led;
         int end_led = goal->end_led;
+        int num_leds = goal->num_leds;
+        bool fade_in = goal->fade_in;
+        bool fade_out = goal->fade_out;
+
+        // Check if override of end_led is possible
+        if(num_leds != 0) { // num_leds always takes precendence over end_led whenever it is != 0
+            int temp_end_led = start_led + num_leds;    // Use the num_leds as offset from start_led to calculate the new end_led
+            end_led = temp_end_led;
+            ROS_WARN("num_leds contains a on-zero value and will override end_led");
+        }
 
         if(start_led < 0) start_led = 0;
         if(end_led >= m_numLeds) end_led = m_numLeds-1;
@@ -389,12 +290,64 @@ public:
                  ros::this_node::getName().c_str(),
                  goal->color.r, goal->color.g, goal->color.b, goal->duration_on, goal->duration_off, start_led, end_led);
 
+        float r = goal->color.r;
+        float g = goal->color.g;
+        float b = goal->color.b;
+        float h, s, v;
+        // Initial conversion
+        RGBConverter::rgbToHsv(r, g, b, &h, &s, &v);
+        ROS_INFO("Target full color (RGB): %.2f %.2f %.2f", r, g, b);
+        ROS_INFO("Target full color (HSV): %.2f %.2f %.2f", h, s, v);
+
+        // If fade_in/fade_out is enable we assign a fixed portion of duration_on to it
+        double fade_in_duration = 0, fade_out_duration = 0;
+        if(fade_in) fade_in_duration = goal->duration_on/4;
+        if(fade_out) fade_out_duration = goal->duration_on/4;
+        double new_duration = goal->duration_on - (fade_in_duration + fade_out_duration);   // the duration when the LEDs will be light up at their full capacity is recalculated based on whether fade_in and/or fade_out has been turned on
+        ROS_INFO("duration_on (%f) will be split into {fade_in: %f | fade_out: %f | full: %f}", goal->duration_on, fade_in_duration, fade_out_duration, new_duration);
+
+        /*double single_step = 0.01;
+        double single_step_duration = (goal->duration_on/4)*single_step;
+        int steps_per_fade_cycle = (goal->duration_on/4)/single_step_duration;*/
+
+        // It is advisable to use a single step of 0.01 for the V (in HSV) for low durations. For longer consider also adding a connection to the duration so that the granularity can be increased resulting in some eye candy
+        const int steps_per_fade_cycle = 100; // hardcoded number of steps per fade cycle; using this we can derive the value of a single step
+        double single_step = v / steps_per_fade_cycle;  // this determines the HSV value increment/decrement and is based on the steps per fade cycle
+        const double single_step_duration = (goal->duration_on/4) / steps_per_fade_cycle; // the duration of a single step is derived from the duration of the fade cycle devided by the steps per cycle
+        ROS_INFO("Single HSV step: %.5f | Single HSV step duration: %.10f | Steps per fade cycle: %d", single_step, single_step_duration, steps_per_fade_cycle);
+
+        v = 0.0;    // Reset value (HSV) since this is the component that we will be working with
+
         for(int i = 0; i < goal->blinks; ++i, --blinks_left)
         {
-            // Set selected LEDs and turn them on
+            // Fade in phase (if enabled)
+            if(fade_in) {
+                ROS_INFO("Fade in");
+                for(int current_step = 0; current_step < steps_per_fade_cycle; v += single_step, ++current_step) {
+                    RGBConverter::hsvToRgb(h, s, v, &r, &g, &b);
+                    m_led->setRangeRGBf(r, g, b, m_numLeds, start_led, end_led);
+                    ros::Duration(single_step_duration).sleep();
+                    ROS_INFO("[%d] HSV: %.2f %.2f %.2f", current_step, h, s, v);
+                }
+            }
+
+            // Full light phase
+            ROS_INFO("Full");
             m_led->setRangeRGBf(goal->color.r, goal->color.g, goal->color.b, m_numLeds, start_led, end_led);
-            ros::Duration(goal->duration_on).sleep();
-            // Set selected LEDs and turn them off
+            ros::Duration(new_duration).sleep();
+
+            // Fade out phase (if enabled)
+            if(fade_out) {
+                ROS_INFO("Fade out");
+                for(int current_step = steps_per_fade_cycle-1; current_step >= 0; v -= single_step, --current_step) {
+                    RGBConverter::hsvToRgb(h, s, v, &r, &g, &b);
+                    m_led->setRangeRGBf(r, g, b, m_numLeds, start_led, end_led);
+                    ros::Duration(single_step_duration).sleep();
+                    ROS_INFO("[%d] HSV: %.2f %.2f %.2f", current_step, h, s, v);
+                }
+            }
+
+            // Turn off LEDs
             m_led->setRangeRGBf(0, 0, 0, m_numLeds, goal->start_led, goal->end_led);
             ros::Duration(goal->duration_off).sleep();
 
@@ -503,9 +456,9 @@ public:
      * @brief fourMusketeersCallback processes FourMusketeersGoal messages - it turns on and off a give stripe of LEDs which is split into 4 separate simultaniously blinking sections with different colors; previous name: lightActionCallback_4 with argument std_msgs::Float32MultiArray::ConstPtr&
      * @param goal
      */
-    void fourMusketeersCallback(const iirob_led::FourMusketeersGoal::ConstPtr& goal) {
-        iirob_led::FourMusketeersFeedback feedback;
-        iirob_led::FourMusketeersResult result;
+    void fourRegionsCallback(const iirob_led::FourRegionsGoal::ConstPtr& goal) {
+        iirob_led::FourRegionsFeedback feedback;
+        iirob_led::FourRegionsResult result;
         int blinks_left = goal->blinks;
         int start_led = goal->start_led;
         int end_led = goal->end_led;
@@ -520,48 +473,48 @@ public:
 
         // Split the given interval of LEDs into 4 more or less equal subsections each with its own coloring
         int half = (end_led - start_led)/2;
-        int start_ledAthos = start_led;
-        int end_ledAthos = start_ledAthos + half/2;
+        int start_ledRegion1 = start_led;
+        int end_ledRegion1 = start_ledRegion1 + half/2;
 
-        int start_ledPorthos = end_ledAthos;
-        int end_ledPorthos = start_ledPorthos + half/2;
+        int start_ledRegion2 = end_ledRegion1;
+        int end_ledRegion2 = start_ledRegion2 + half/2;
 
-        int start_ledAramis = end_ledPorthos;
-        int end_ledAramis = start_ledAramis + half/2;
+        int start_ledRegion3 = end_ledRegion2;
+        int end_ledRegion3 = start_ledRegion3 + half/2;
 
-        int start_ledDArtagnan = end_ledAramis;
-        int end_ledDArtagnan = end_led;
+        int start_ledRegion4 = end_ledRegion3;
+        int end_ledRegion4 = end_led;
 
-        ROS_INFO("%s starting Four Musketeers action with duration(ON): %.2f sec and duration(OFF): %.2f\n\n\t Athos\t\tstart led: %d, end led: %d\tcolor: %.2f %.2f %.2f \n\t Porthos\tstart led: %d, end led: %d\tcolor: %.2f %.2f %.2f \n\t Aramis\t\tstart led: %d, end led: %d\tcolor: %.2f %.2f %.2f \n\t DArtagnan\tstart led: %d, end led: %d\tcolor: %.2f %.2f %.2f ",
+        ROS_INFO("%s starting Four Musketeers action with duration(ON): %.2f sec and duration(OFF): %.2f\n\n\t Region1\t\tstart led: %d, end led: %d\tcolor: %.2f %.2f %.2f \n\t Region2\tstart led: %d, end led: %d\tcolor: %.2f %.2f %.2f \n\t Region3\t\tstart led: %d, end led: %d\tcolor: %.2f %.2f %.2f \n\t Region4\tstart led: %d, end led: %d\tcolor: %.2f %.2f %.2f ",
                  ros::this_node::getName().c_str(),
                  goal->duration_on, goal->duration_off,
-                 start_ledAthos, end_ledAthos,
+                 start_ledRegion1, end_ledRegion1,
                  goal->color1.r, goal->color1.g, goal->color1.b,
-                 start_ledPorthos, end_ledPorthos,
+                 start_ledRegion2, end_ledRegion2,
                  goal->color2.r, goal->color2.g, goal->color2.b,
-                 start_ledAramis, end_ledAramis,
+                 start_ledRegion3, end_ledRegion3,
                  goal->color3.r, goal->color3.g, goal->color3.b,
-                 start_ledDArtagnan, end_ledDArtagnan,
+                 start_ledRegion4, end_ledRegion4,
                  goal->color4.r, goal->color4.g, goal->color4.b);
 
         for(int i = 0; i < goal->blinks; ++i, --blinks_left)
         {
             // Set selected LEDs and turn them on
-            m_led->setRangeRGBf(goal->color1.r, goal->color1.g, goal->color1.b, m_numLeds, start_ledAthos, end_ledAthos);
-            m_led->setRangeRGBf(goal->color2.r, goal->color2.g, goal->color2.b, m_numLeds, start_ledPorthos, end_ledPorthos);
-            m_led->setRangeRGBf(goal->color3.r, goal->color3.g, goal->color3.b, m_numLeds, start_ledAramis, end_ledAramis);
-            m_led->setRangeRGBf(goal->color4.r, goal->color4.g, goal->color4.b, m_numLeds, start_ledDArtagnan, end_ledDArtagnan);
+            m_led->setRangeRGBf(goal->color1.r, goal->color1.g, goal->color1.b, m_numLeds, start_ledRegion1, end_ledRegion1);
+            m_led->setRangeRGBf(goal->color2.r, goal->color2.g, goal->color2.b, m_numLeds, start_ledRegion2, end_ledRegion2);
+            m_led->setRangeRGBf(goal->color3.r, goal->color3.g, goal->color3.b, m_numLeds, start_ledRegion3, end_ledRegion3);
+            m_led->setRangeRGBf(goal->color4.r, goal->color4.g, goal->color4.b, m_numLeds, start_ledRegion4, end_ledRegion4);
             ros::Duration(goal->duration_on).sleep();
             // Set selected LEDs and turn them off
-            m_led->setRangeRGBf(0, 0, 0, m_numLeds, start_ledAthos, end_ledAthos);
-            m_led->setRangeRGBf(0, 0, 0, m_numLeds, start_ledPorthos, end_ledPorthos);
-            m_led->setRangeRGBf(0, 0, 0, m_numLeds, start_ledAramis, end_ledAramis);
-            m_led->setRangeRGBf(0, 0, 0, m_numLeds, start_ledDArtagnan, end_ledDArtagnan);
+            m_led->setRangeRGBf(0, 0, 0, m_numLeds, start_ledRegion1, end_ledRegion1);
+            m_led->setRangeRGBf(0, 0, 0, m_numLeds, start_ledRegion2, end_ledRegion2);
+            m_led->setRangeRGBf(0, 0, 0, m_numLeds, start_ledRegion3, end_ledRegion3);
+            m_led->setRangeRGBf(0, 0, 0, m_numLeds, start_ledRegion4, end_ledRegion4);
             ros::Duration(goal->duration_off).sleep();
 
             feedback.blinks_left = blinks_left;
             ROS_INFO("%s: Four Musketeers will blink %d more times", ros::this_node::getName().c_str(), feedback.blinks_left);
-            fourMusketeersAS.publishFeedback(feedback);
+            fourRegionsAS.publishFeedback(feedback);
         }
 
         feedback.blinks_left = blinks_left;
@@ -569,12 +522,12 @@ public:
 
         m_led->setAllRGBf(0, 0, 0, m_numLeds);
         result.blinks_left = blinks_left;
-        fourMusketeersAS.setSucceeded(result);
+        fourRegionsAS.setSucceeded(result);
     }
 
-    void runningBunnyCallback(const iirob_led::RunningBunnyGoal::ConstPtr& goal) {
-        iirob_led::RunningBunnyFeedback feedback;
-        iirob_led::RunningBunnyResult result;
+    void chaserLightCallback(const iirob_led::ChaserLightGoal::ConstPtr& goal) {
+        iirob_led::ChaserLightFeedback feedback;
+        iirob_led::ChaserLightResult result;
 
         int head = goal->head;
         int body = goal->body;
@@ -624,7 +577,7 @@ public:
                 }
 
                 feedback.current_head_pos = _head;
-                runningBunnyAS.publishFeedback(feedback);
+                chaserLightAS.publishFeedback(feedback);
 
                 _head = (_head + goal->skip_leds_per_step) % m_numLeds;
                 _tail = _head - body;
@@ -642,13 +595,13 @@ public:
 
         m_led->setAllRGBf(0, 0, 0, m_numLeds);
         feedback.current_head_pos = head;
-        runningBunnyAS.publishFeedback(feedback);
+        chaserLightAS.publishFeedback(feedback);
         result.current_head_pos = head;
-        runningBunnyAS.setSucceeded(result);
+        chaserLightAS.setSucceeded(result);
     }
 
     /**
-     * @brief runningBunnyCallback processes RunningBunnyGoal messages - a given stripe of LEDs (bunny) "jumps" in circle (a jump is defined as the number of LEDs that are skipped by the bunny); previous name: lightActionCallback_6 with argument std_msgs::Float32MultiArray::ConstPtr&
+     * @brief chaserLightCallback processes RunningBunnyGoal messages - a given stripe of LEDs (bunny) "jumps" in circle (a jump is defined as the number of LEDs that are skipped by the bunny); previous name: lightActionCallback_6 with argument std_msgs::Float32MultiArray::ConstPtr&
      * @param goal
      */
     /* OLD VERSION
@@ -826,7 +779,7 @@ public:
      * @brief changelingCallback processes ChangelingGoal messages - similar to Blinky but currently only for a single "blink" and supports fluent transition from black to specifed color and reverse; previous name: lightActionCallback_7 with argument std_msgs::Float32MultiArray::ConstPtr&
      * @param goal
      */
-    void changelingCallback(const iirob_led::ChangelingGoal::ConstPtr& goal) {
+    /*void changelingCallback(const iirob_led::ChangelingGoal::ConstPtr& goal) {
         iirob_led::ChangelingFeedback feedback;
         iirob_led::ChangelingResult result;
 
@@ -836,8 +789,8 @@ public:
         if(start_led < 0) start_led = 0;
 
         double step = goal->step;
-        if(step < 0.001) step = 0.1;
-        if(step > 0.5) step = 0.1;                  // De facto this is a Blinky action
+        if(step < .001) step = .1;
+        if(step > .5) step = .1;                  // De facto this is a Blinky action
         int stepsPerHalfCycle = 1/step;             // we use integer since there is no such thing as (for example) 1/3 loop cycle ;)
         int stepsPerCycle = 2*stepsPerHalfCycle;    // full cycle contains two half-cycles
         int currentStep;
@@ -881,7 +834,7 @@ public:
         m_led->setAllRGBf(0, 0, 0, m_numLeds);
         result.steps_in_cycle_left = currentStep;
         changelingAS.setSucceeded(result);
-    }
+    }*/
 
     /*void spinnerCallback(const iirob_led::SpinnerGoal::ConstPtr& goal) {
 
@@ -894,7 +847,6 @@ public:
 
 int main(int argc, char **argv)
 {
-
     std::string port;
 	int num;
 	bool override;
@@ -913,31 +865,8 @@ int main(int argc, char **argv)
     ROS_INFO("IIROB-LED node %s: Setting number of LEDs to %d", ros::this_node::getName().c_str(), num);
 
     ROS_INFO("IIROB-LED node %s: Initializing ledNode on port %s with %d LEDs.", ros::this_node::getName().c_str(), port.c_str(), num);
-//    LEDNode *ledNode = new LEDNode(nh);
     LEDNode *ledNode = new LEDNode(nh, port, num);
-
-    // move all that is below to LEDNode
-    //if (ledNode->init(port, num)) {
-    /*if (ledNode->getStatus()) {
-
-        // MOVE THOSE TO CONSTRUCTOR OF LEDNODE
-        ros::Subscriber sub = nh.subscribe("led_command", 10, &LEDNode::commandCallback, ledNode);
-        ros::Subscriber sub3 = nh.subscribe("chosen_directory", 10, &LEDNode::directoryCallback, ledNode);
-        ros::Subscriber sub2 = nh.subscribe("led_color", 10, &LEDNode::colorCallback, ledNode);
-
-
-        ros::ServiceServer set_led_directory_srv = nh.advertiseService("set_led_directory", &LEDNode::set_led_directory, ledNode);
-        //ROS_INFO("%s: Service for set motor rotational speed [rpm] started on: %s", ros::this_node::getName().c_str(), set_led_directory_srv.getService().c_str()); // ?????????
-        ROS_INFO("%s: IIROB-LED directory set to %s", ros::this_node::getName().c_str(), set_led_directory_srv.getService().c_str());
-
-        ros::spin();
-
-        delete ledNode;
-    }
-    else {
-        ROS_ERROR("IIROB-LED node %s: Initializing ledNode on port %s with %d LEDs failed!", ros::this_node::getName().c_str(), port.c_str(), num);
-    }*/
-
     if(ledNode->getStatus()) ledNode->spin();
+    delete ledNode;
     return 0;
 }

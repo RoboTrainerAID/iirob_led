@@ -1,9 +1,15 @@
 std_msgs/ColorRGBA color    # RGB values [0-1] for all LEDs
 int32  blinks               # Number of blinks (1 blink = 1 time on + 1 time off)
-float32 duration_on         # in [s]
-float32 duration_off        # in [s]
+float64 duration_on         # in [s]
+float64 duration_off        # in [s]
 int32 start_led             # First LED in the stripe where LEDs will blink
 int32 end_led               # Last LED in the stripe where LEDs will blink
+int32 num_leds              # Number of LEDs relative to start_led (if != 0 it overrides end_led)
+
+# If fade_in = fade_out = FALSE we have the normal blinky
+# else split duration_on
+bool fade_in                # Use changeling functionality if this is TRUE
+bool fade_out               # Use changeling functionality if this is TRUE
 ---
 int32 blinks_left           # Number of blinks left until the goal is completed (change this to some decent feedback)
 ---

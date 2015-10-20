@@ -9,6 +9,7 @@ int32 body                  # Body of the bunny - size of the strip that represe
 # Example: head at position 5 with body length of 3 means that the bunny is represented by LEDs 5,4,3,2 (1 LED for head + 3 LEDs for body)
 int32 num_circles           # Number of full circles (head to head LED position)
 int32 skip_leds_per_step    # Number of LEDs to jump over (basically this determines how fast the bunny runs)
+bool reverse                # The light strip moves in the other direction
 ---
 int32 current_head_pos           # Number of blinks left until the goal is completed (change this to some decent feedback)
 ---

@@ -195,7 +195,7 @@ bool LEDStrip::setHue(float* hue, int n, bool log) {
 	return LEDStrip::setRGB(rgbtemp, n, log);
 }
 
-bool LEDStrip::setAllRGB(unsigned char red, unsigned char green, unsigned char blue, int n, bool log){
+bool LEDStrip::setAllRGB(unsigned char red, unsigned char green, unsigned char blue, int n, bool log) {
 	if (n*3>sizeof(rgbtemp))
 		return false;
 	for (int i = 0; i<(n*3); i+=3) {
@@ -267,7 +267,7 @@ bool LEDStrip::setXRangeRGB(unsigned char* rgb, int n, int start_led, int end_le
 	buf[0] = LEDStrip::START;
 	buf[1] = (char)(n>>8);
 	buf[2] = (char)n;
-    for (int i = 2+(start_led*3)+1; i<(end_led*3+2)+1; i++) //+1
+    for (int i = 2+(start_led*3)+1; i<2+(end_led*3)+1; i++) //+1
         buf[i] = log ? led_lut[*rgb++] : *rgb++;
 	buf[n*3+3] = LEDStrip::END;
 	ok &= send(buf, n*3+4);
@@ -276,8 +276,8 @@ bool LEDStrip::setXRangeRGB(unsigned char* rgb, int n, int start_led, int end_le
 	return ok;
 }
 
-bool LEDStrip::setRangeRGB(unsigned char red, unsigned char green, unsigned char blue, int n, int start_led, int end_led, bool log){
-    //
+bool LEDStrip::setRangeRGB(unsigned char red, unsigned char green, unsigned char blue, int numLeds, int start_led, int end_led, bool log) {
+
     //if (n*3>sizeof(rgbtemp))
     //	return false;
 
@@ -290,7 +290,7 @@ bool LEDStrip::setRangeRGB(unsigned char red, unsigned char green, unsigned char
     else                    // start_led > end_led  (reversed LED mode: range follows the reversed indexing of the buffer array) Example: start_led = 63; end_led = 20 -> affected LEDs: [63...num_of_leds] + [0..20]
         mode = 2;*/
 
-    for (int i = 0; i<(n*3); i+=3) {
+    for (int i = 0; i<(numLeds*3); i+=3) {
 #ifdef THREEWIRE
         rgbtemp[i]   = green;
         rgbtemp[i+1] = red;
@@ -301,7 +301,28 @@ bool LEDStrip::setRangeRGB(unsigned char red, unsigned char green, unsigned char
         rgbtemp[i+2] = red;
 #endif
     }
-    return setXRangeRGB(rgbtemp, n, start_led, end_led, log);
+
+    if(start_led > end_led) {
+        // Case when the starting LED comes after the ending one - this happens when a transition [last LED index -> first LED index] occurs
+        // In this situation we split the range into two parts - one is from start_led to last LED and the other one - from first LED to end_led
+        bool firstRange = setXRangeRGB(rgbtemp, numLeds, start_led, numLeds, log);
+        bool secondRange = setXRangeRGB(rgbtemp, numLeds, 0, end_led, log);
+        return firstRange && secondRange;
+    }
+    else if (start_led < end_led) {
+        // Case when starting LED comes before the ending one - normal case; nothing special to do here
+        return setXRangeRGB(rgbtemp, numLeds, start_led, end_led, log);
+    }
+    else {
+        // Case when starting LED is the same as the ending one - we assume that this is a single LED that we want to light up (otherwise the user would have just called one of the setAllRGB() methods)
+        // Currently I don't know how to turn on a single LED at a specific location.
+        // Either turn on a single LED or turn on all LEDs (setAllRGB())
+
+        // For now we say that all LEDs will be lit up
+        return setRGB(rgbtemp, 10, log);//setAllRGB(red, green, blue, numLeds, log);
+    }
+
+    //return setXRangeRGB(rgbtemp, numLeds, start_led, end_led, log);
 }
 
 bool LEDStrip::setRangeRGBf(float red, float green, float blue, int n, int start_led, int end_led, bool log) {

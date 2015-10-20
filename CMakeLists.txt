@@ -4,8 +4,8 @@ project(iirob_led)
 #TODO Remove when testing is done
 set(CMAKE_BUILD_TYPE Debug)
 
-SET(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS} -fPIC"  )
-SET(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_DEBUG} -Wall -s -O3 -g0"  )
+set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS} -fPIC")
+set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_DEBUG} -Wall -s -O3 -g0") #-Os
 
 find_package(catkin REQUIRED COMPONENTS
   actionlib
@@ -28,13 +28,13 @@ add_message_files(
 
 add_action_files(
   FILES
-  #PlayLed.action            # ???
+  #PlayLed.action           # ???
   Blinky.action             # action 2
   Police.action             # action 3
-  FourMusketeers.action     # action 4
-  RunningBunny.action       # action 5
-  Spinner.action            # action 6
-  Changeling.action         # action 7
+  FourRegions.action     # action 4
+  ChaserLight.action       # action 5
+#  Spinner.action            # action 6
+#  Changeling.action         # action 7
 )
 
 ## Generate added messages and services with any dependencies listed here
@@ -83,13 +83,13 @@ target_link_libraries(${PROJECT_NAME}_node
   ${catkin_LIBRARIES}
 )
 
-add_executable(${PROJECT_NAME}_node_client_test src/iirob_led_node_client_test.cpp)
-add_dependencies(${PROJECT_NAME}_node_client_test ${PROJECT_NAME}_generate_messages_cpp)
-target_link_libraries(${PROJECT_NAME}_node_client_test
-  ${PROJECT_NAME}
-  rgbconverter
-  ${catkin_LIBRARIES}
-)
+#add_executable(${PROJECT_NAME}_node_client_test src/iirob_led_node_client_test.cpp)
+#add_dependencies(${PROJECT_NAME}_node_client_test ${PROJECT_NAME}_generate_messages_cpp)
+#target_link_libraries(${PROJECT_NAME}_node_client_test
+#  ${PROJECT_NAME}
+#  rgbconverter
+#  ${catkin_LIBRARIES}
+#)
 
 #############
 ## Install ##

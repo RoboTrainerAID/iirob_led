@@ -16,6 +16,8 @@
 #include <cstdlib>
 #include <vector>
 
+// NOTE This is just for testing!
+
 #define DURATION_ON 1
 #define DURATION_OFF .5
 #define BLINKS 1
