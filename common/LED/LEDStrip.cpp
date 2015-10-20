@@ -255,40 +255,40 @@ std::vector<float> LEDStrip::hueToRGB(float hue) {
 	return rgb;
 }
 
-//////////////////////////////////////////////////////////////////////////////////////////////
-// TODO Add circular buffer
-// TODO Add the case where start_led > end_led. Right now if this happens the result is nada
-// TODO Document the library
-//Methods for modifying individual parts of the strip
-bool LEDStrip::setXRangeRGB(unsigned char* rgb, int n, int start_led, int end_led, bool log) {
-	if ((n*3+4)>sizeof(buf))
+/////////////////////////////////////// NEW FEATURES :P ////////////////////////////////////////
+bool LEDStrip::setSingleRGB(unsigned char red, unsigned char green, unsigned char blue, int totNumLeds, int index, bool log) {
+  if(index >= totNumLeds) // Out of range
+      return false;
+
+  // TODO Light up single LED at position INDEX
+
+  return false;
+}
+
+// Methods for modifying individual parts of the strip
+bool LEDStrip::setXRangeRGB(unsigned char* rgb, int numLeds, int start_led, int end_led, bool log) {
+    if ((numLeds*3+4)>sizeof(buf))
 		return false;
-	bool ok = true;
+
+    bool ok = true;
 	buf[0] = LEDStrip::START;
-	buf[1] = (char)(n>>8);
-	buf[2] = (char)n;
+    buf[1] = (char)(numLeds>>8);
+    buf[2] = (char)numLeds;
+
     for (int i = 2+(start_led*3)+1; i<2+(end_led*3)+1; i++) //+1
         buf[i] = log ? led_lut[*rgb++] : *rgb++;
-	buf[n*3+3] = LEDStrip::END;
-	ok &= send(buf, n*3+4);
+
+    buf[numLeds*3+3] = LEDStrip::END;
+    ok &= send(buf, numLeds*3+4);
 	ok &= receive(buf, 1);
 	ok &= (buf[0]==LEDStrip::OK);
-	return ok;
+
+    return ok;
 }
 
 bool LEDStrip::setRangeRGB(unsigned char red, unsigned char green, unsigned char blue, int numLeds, int start_led, int end_led, bool log) {
-
-    //if (n*3>sizeof(rgbtemp))
-    //	return false;
-
-    /*int mode = 0;
-    int diff = start_led - end_led;
-    if(!diff)               // start_led == end_led (single LED mode: range consists of a single LED) Example: start_led = 20, end_led = 20 -> affected LEDs: [20]
-        mode = 0;
-    else if(diff < 0)       // start_led < end_led  (normal LED mode: range follows the normal indexing of the buffer array) Example: start_led = 20, end_led = 63 -> affected LEDs: [20..63]
-        mode = 1;
-    else                    // start_led > end_led  (reversed LED mode: range follows the reversed indexing of the buffer array) Example: start_led = 63; end_led = 20 -> affected LEDs: [63...num_of_leds] + [0..20]
-        mode = 2;*/
+    if (numLeds*3 > sizeof(rgbtemp))
+        return false;
 
     for (int i = 0; i<(numLeds*3); i+=3) {
 #ifdef THREEWIRE
@@ -307,6 +307,7 @@ bool LEDStrip::setRangeRGB(unsigned char red, unsigned char green, unsigned char
         // In this situation we split the range into two parts - one is from start_led to last LED and the other one - from first LED to end_led
         bool firstRange = setXRangeRGB(rgbtemp, numLeds, start_led, numLeds, log);
         bool secondRange = setXRangeRGB(rgbtemp, numLeds, 0, end_led, log);
+
         return firstRange && secondRange;
     }
     else if (start_led < end_led) {
@@ -319,17 +320,18 @@ bool LEDStrip::setRangeRGB(unsigned char red, unsigned char green, unsigned char
         // Either turn on a single LED or turn on all LEDs (setAllRGB())
 
         // For now we say that all LEDs will be lit up
-        return setRGB(rgbtemp, 10, log);//setAllRGB(red, green, blue, numLeds, log);
+        // start_led = end_led = index of LED that is to be lit up
+        return setSingleRGB(red, green, blue, start_led, log);
+        //return setRGB(rgbtemp, 10, log); // Turn on all LEDs
     }
 
     //return setXRangeRGB(rgbtemp, numLeds, start_led, end_led, log);
 }
 
 bool LEDStrip::setRangeRGBf(float red, float green, float blue, int n, int start_led, int end_led, bool log) {
-    // By checking here if the number of LEDs is okay we can skip the extra jump to setRangeRGB() in case the result of this check is false
-    // Note: it doesn't make sense for the given LEDs to exceed the actually present ones
     if (n*3>sizeof(rgbtemp))
         return false;
-	return LEDStrip::setRangeRGB((unsigned char)(red*255.0), (unsigned char)(green*255.0),
+
+    return LEDStrip::setRangeRGB((unsigned char)(red*255.0), (unsigned char)(green*255.0),
             (unsigned char)(blue*255.0), n, start_led, end_led, log);
 }
