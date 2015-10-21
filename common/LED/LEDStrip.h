@@ -60,7 +60,7 @@ namespace iirob_hardware {
 
         /////////////////////////////////////// NEW FEATURES :P ////////////////////////////////////////
         /** Sets a single LED at the given index to the specified RGB color value */
-        bool setSingleRGB(unsigned char red, unsigned char green, unsigned char blue, int totNumLeds, int index, bool log=true);
+        bool setXSingleRGB(unsigned char* rgb, int totNumLeds, int index, bool log=true);
         /** Methods for modifying individual parts of the strip */
         bool setXRangeRGB(unsigned char* rgb, int totNumLeds, int start_led, int end_led, bool log=false);
         /** Set RGB value of all leds */

@@ -256,13 +256,31 @@ std::vector<float> LEDStrip::hueToRGB(float hue) {
 }
 
 /////////////////////////////////////// NEW FEATURES :P ////////////////////////////////////////
-bool LEDStrip::setSingleRGB(unsigned char red, unsigned char green, unsigned char blue, int totNumLeds, int index, bool log) {
-  if(index >= totNumLeds) // Out of range
+bool LEDStrip::setXSingleRGB(unsigned char* rgb, int numLeds, int index, bool log) {
+  if(index > numLeds) // Out of range
+      return false;
+
+  if ((numLeds*3+4)>sizeof(buf))
       return false;
 
   // TODO Light up single LED at position INDEX
+  if ((numLeds*3+4)>sizeof(buf))
+      return false;
 
-  return false;
+  bool ok = true;
+  buf[0] = LEDStrip::START;
+  buf[1] = (char)(numLeds>>8);
+  buf[2] = (char)numLeds;
+
+  for (int i = (index*3)+3; i < (index*3)+3; i++)
+      buf[i] = log ? led_lut[*rgb++] : *rgb++;
+
+  buf[numLeds*3+3] = LEDStrip::END;
+  ok &= send(buf, numLeds*3+4);
+  ok &= receive(buf, 1);
+  ok &= (buf[0]==LEDStrip::OK);
+
+  return ok;
 }
 
 // Methods for modifying individual parts of the strip
@@ -275,13 +293,13 @@ bool LEDStrip::setXRangeRGB(unsigned char* rgb, int numLeds, int start_led, int 
     buf[1] = (char)(numLeds>>8);
     buf[2] = (char)numLeds;
 
-    for (int i = 2+(start_led*3)+1; i<2+(end_led*3)+1; i++) //+1
+    for (int i = (start_led*3)+3; i < (end_led*3)+3; i++)
         buf[i] = log ? led_lut[*rgb++] : *rgb++;
 
     buf[numLeds*3+3] = LEDStrip::END;
     ok &= send(buf, numLeds*3+4);
 	ok &= receive(buf, 1);
-	ok &= (buf[0]==LEDStrip::OK);
+    ok &= (buf[0]==LEDStrip::OK);
 
     return ok;
 }
@@ -321,7 +339,7 @@ bool LEDStrip::setRangeRGB(unsigned char red, unsigned char green, unsigned char
 
         // For now we say that all LEDs will be lit up
         // start_led = end_led = index of LED that is to be lit up
-        return setSingleRGB(red, green, blue, start_led, log);
+        return setXSingleRGB(rgbtemp, start_led, log);
         //return setRGB(rgbtemp, 10, log); // Turn on all LEDs
     }
 

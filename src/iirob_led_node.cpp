@@ -24,7 +24,6 @@
 #define QUADRANT_THIRD  3   // 3rd quadrant: -x, -y
 #define QUADRANT_FOURTH 4   // 4th quadrant: +x, -y
 
-// FIXME #LEDs - 384 (last LED not lit)
 // Ruben -> take his caluclations for the LEDs
 #define CORNER_FRONT_LEFT   0
 #define CORNER_BACK_LEFT    108
@@ -43,11 +42,10 @@ const int led_corner_back_left = short_side + 2*long_side;
 const int led_corner_front_left = led_end;
 
 // TODO override - when ready set to false
-// TODO directoryCallback, set_led_directory - replace this with a vector (btw it's DIRECTION not directory -_-)
 // TODO Check return value for all iirob::hardware functions (setAllRGBf(), setRangeRGBf() etc.)
 // TODO Add a duration parameter (number of steps per cycle should be determined from it) to Changeling (just add two modes)
 // TODO All the checks if start_led or end_led are negative or not can be avoided by simply using unsigned chars (as far as I can tell internally the LED library is actually using this type)
-// TODO Reimplement setRangeRGBX, setRangeRGB and setRangeRGBf. The way those three are working now is - to put it mildly - in a very poor manner.
+// TODO Remove all ROS_INFO (wherever it makes sense) and replace it with ROS_DEBUG
 // NOTE Except for color values (ColorRGBA requires float) use double (float64 in ROS) for more accuracy
 
 class LEDNode
@@ -228,7 +226,6 @@ public:
          *           [forceRoundend]
          */
 
-        // TODO Remove all ROS_INFOs here
         switch(corner) {
         case CORNER_FRONT_RIGHT:
             // Example: forceRounded = 5, CORNER_FRONT_RIGHT = 300
@@ -240,7 +237,6 @@ public:
             ROS_INFO("Corner: front right | from %d to %d", corner, corner+forceRounded);
             break;
         case CORNER_FRONT_LEFT:
-            // FIXME Same issue as with the RunningBunny - going from 422 to 0 causes only the 0..x to be displayed
             m_led->setRangeRGBf(0, 0, 1, m_numLeds, corner, corner+forceRounded);
             ROS_INFO("Corner: front left | from %d to %d", corner, corner+forceRounded);
             m_led->setRangeRGBf(1, 0, 0, m_numLeds, m_numLeds-forceRounded, m_numLeds-1);
@@ -287,15 +283,21 @@ public:
         ROS_WARN("Due to latency issues if duration_on is set low enough the resulting blinking will take longer. This applies to a greater extent if fade_in and/or fade_out are enabled. When disabled the reposnse is much more accurate.");
 
         // Check if override of end_led is possible
-        if(num_leds != 0) { // num_leds always takes precendence over end_led whenever it is != 0
-            int temp_end_led = start_led + num_leds;    // Use the num_leds as offset from start_led to calculate the new end_led
-            end_led = temp_end_led;
-            ROS_WARN("num_leds contains a on-zero value and will override end_led");
+        if(num_leds != 0) { // num_leds always takes precendence over end_led whenever if is != 0 and doesn't exceed the total number of LEDs in the strip
+            if(num_leds <= m_numLeds) {
+                // Use the num_leds as offset from start_led to calculate the new end_led
+                end_led = (start_led-1 + num_leds) % m_numLeds;   // FIXME num_leds seems to be broken
+                //end_led = (start_led + num_leds); // OLD
+                ROS_WARN("num_leds contains a non-zero value and will override end_led");
+            }
+            else
+                ROS_WARN("num_leds contains a non-zero value, which however exceeds the total number of available LEDs in the strip. Falling back to end_led.");
         }
 
         if(start_led < 0) start_led = 0;
-        if(end_led >= m_numLeds) end_led = m_numLeds-1;
+        if(end_led > m_numLeds) end_led = m_numLeds;
 
+        ROS_INFO("start_led: %d | end_led: %d", start_led, end_led);
         ROS_DEBUG("%s starting Blinky action with color [%f %f %f] [RGB]. Duration(ON): %f sec, Duration(OFF): %f, start led: %d, end led: %d",
                  ros::this_node::getName().c_str(),
                  goal->color.r, goal->color.g, goal->color.b, goal->duration_on, goal->duration_off, start_led, end_led);
@@ -473,11 +475,11 @@ public:
         int end_led = goal->end_led;
 
         if(start_led < 0) start_led = 0;
-        if(end_led >= m_numLeds) end_led = m_numLeds-1;
+        if(end_led > m_numLeds) end_led = m_numLeds;
 
         if(end_led - start_led < 3) {
             start_led = 0;
-            end_led = m_numLeds-1;
+            end_led = m_numLeds;
         }
 
         // Split the given interval of LEDs into 4 more or less equal subsections each with its own coloring
@@ -494,7 +496,7 @@ public:
         int start_ledRegion4 = end_ledRegion3;
         int end_ledRegion4 = end_led;
 
-        ROS_INFO("%s starting Four Musketeers action with duration(ON): %.2f sec and duration(OFF): %.2f\n\n\t Region1\t\tstart led: %d, end led: %d\tcolor: %.2f %.2f %.2f \n\t Region2\tstart led: %d, end led: %d\tcolor: %.2f %.2f %.2f \n\t Region3\t\tstart led: %d, end led: %d\tcolor: %.2f %.2f %.2f \n\t Region4\tstart led: %d, end led: %d\tcolor: %.2f %.2f %.2f ",
+        ROS_INFO("%s starting Four Musketeers action with duration(ON): %.2f sec and duration(OFF): %.2f\n\n\t Region1\tstart led: %d, end led: %d\tcolor: %.2f %.2f %.2f \n\t Region2\tstart led: %d, end led: %d\tcolor: %.2f %.2f %.2f \n\t Region3\tstart led: %d, end led: %d\tcolor: %.2f %.2f %.2f \n\t Region4\tstart led: %d, end led: %d\tcolor: %.2f %.2f %.2f ",
                  ros::this_node::getName().c_str(),
                  goal->duration_on, goal->duration_off,
                  start_ledRegion1, end_ledRegion1,
@@ -549,6 +551,7 @@ public:
 
         int cycles = goal->num_of_cycles;
         double cycle_duration = goal->cycle_duration;
+        if(cycle_duration <= 0) cycle_duration = 10.0;  // Very important to avoid negative and especially 0 values here due to the way skip_per_step is currently caluclated
         // TODO Add the feature "reverse direction"
         bool reverse = goal->reverse;
 
@@ -575,7 +578,7 @@ public:
                 m_led->setRangeRGBf(goal->color.r, goal->color.g, goal->color.b, m_numLeds, tail, head);
                 // TODO Add HSV gradient (head is brightest, tail is dimmest). This will be possible only then when we can control a single LED
                 // Wait a little bit
-                ros::Duration(single_step_duration).sleep();
+                //ros::Duration(single_step_duration).sleep();  // required but for now I can't figure out how to combine it with the rest speed-related stuff
                 // Update the head and tail position of the strip
                 head = (head + skip_per_step) % m_numLeds;
                 tail = (head - offset);
@@ -676,8 +679,6 @@ public:
 
     /* OLD VERSION
      void runningBunnyCallback(const iirob_led::RunningBunnyGoal::ConstPtr& goal) {
-        // TODO Use modulo to create a neat transition between previous and next circle!
-        // TODO Change RGB values logarithmic
         ROS_INFO("RUNNING BUNNY CALLBACK");
         iirob_led::RunningBunnyFeedback feedback;
         iirob_led::RunningBunnyResult result;
@@ -741,8 +742,6 @@ public:
     //      The head and body can be used in order to determine in which direction the bunny has to run. If the tail's position < head's position
     //      then the bunny has to run from 0 to 422 (or similar values) otherwise it has to run from 422 to 0 (or similar values)
     /*void runningBunnyCallback(const iirob_led::RunningBunnyGoal::ConstPtr& goal) {
-        // TODO Use modulo to create a neat transition between previous and next circle!
-        // TODO Change RGB values using the routine from Changeling
         ROS_INFO("RUNNING BUNNY CALLBACK");
         iirob_led::RunningBunnyFeedback feedback;
         iirob_led::RunningBunnyResult result;
