@@ -172,6 +172,7 @@ public:
      * @brief forceCallback
      * @param led_force_msg
      */
+    // TODO Use Ruben's variables; also this can be completed AFTER a single LED can be lit up; change in display (force = 1: only corner LED is on, force = 2: corner plus LED on each side is on etc.)
     void forceCallback(const iirob_led::DirectionWithForce::ConstPtr& led_force_msg) {
         // Calculate the force
         double x = led_force_msg->force.x;
@@ -533,85 +534,146 @@ public:
         fourRegionsAS.setSucceeded(result);
     }
 
+    /**
+     * @brief chaserLightCallback processes ChaserLightGoal messages - a given stripe of LEDs traverses the whole strip in circle N times; previous name (maybe? never managed to make it work...): lightActionCallback_6 with argument std_msgs::Float32MultiArray::ConstPtr&
+     * @param goal
+     */
     void chaserLightCallback(const iirob_led::ChaserLightGoal::ConstPtr& goal) {
         iirob_led::ChaserLightFeedback feedback;
         iirob_led::ChaserLightResult result;
 
-        int head = goal->head;
-        int body = goal->body;
-        float r = goal->color.r;
-        float g = goal->color.g;
-        float b = goal->color.b;
-        int counter = 0;
-        int circles = goal->num_circles;
-        bool split = false;
-        int _splitPos = 0;
-        int _after_split = m_numLeds-1;
-        int _head, _tail = head - body;
-        int _tail_non_negative = (_tail < 0) ? _tail + m_numLeds : _tail;   //423-1 = 422, 423-2 = 421, 423-3 = 420 ...
-        int _tail_non_negative_old = _tail_non_negative-1;
+        int head = (goal->start_led < 0) ? 0 : goal->start_led;
+        int offset = goal->num_of_leds;
+        if(offset <= 0) offset = 2;
+        int tail;
 
+        int cycles = goal->num_of_cycles;
+        double cycle_duration = goal->cycle_duration;
+        // TODO Add the feature "reverse direction"
+        bool reverse = goal->reverse;
 
-        printf("Starting position: (head[%d] - tail[%d])\n-----------------------------------------\n", head, (head - body) % m_numLeds);
+        double single_step_duration = cycle_duration / m_numLeds; // Number of LEDs that the strip will skip
 
-        for(int circle = 0; circle < circles; circle++) {
-            _head = head;
-            _tail = head - body;
-            //_tail_non_negative_old = _tail_non_negative;
+        // TODO See how to determine the speed properly
+        // lowest skip_per_step is 1
+        int skip_per_step = m_numLeds / cycle_duration; // Speed based on the number of LEDs per cycle and how long it takes to traverse all
+        //int skip_per_step = 1;
 
-            for(counter = 0; counter < m_numLeds; counter+=goal->skip_leds_per_step) {
-                //_tail_non_negative_old = _tail_non_negative-1;
+        ROS_INFO("head: %d | offset: %d | time per step: %f", head, offset, single_step_duration);
 
-                if(_tail < 0) {
-                    split = true;
-                    _tail_non_negative = _tail + m_numLeds;
-                } else {
-                    split = false;
-                    _tail_non_negative = _tail;
-                }
+        int old_tail;  // will use this to turn off the trail after the strip has moved
+        for(int current_cycle = 0; current_cycle < cycles; current_cycle++) {
+            // Prepare for the cycle
+            head = (goal->start_led < 0) ? 0 : goal->start_led;
+            tail = (head - offset);
+            if(tail < 0) tail = tail + m_numLeds;
+            old_tail = tail;
+            // Movement withing a single cycle
+            for(int pos = 0; pos < m_numLeds; pos+=skip_per_step) {
+                ROS_INFO("Head: %d | Tail: %d | ", head, tail);
+                // Light up the strip
+                m_led->setRangeRGBf(goal->color.r, goal->color.g, goal->color.b, m_numLeds, tail, head);
+                // TODO Add HSV gradient (head is brightest, tail is dimmest). This will be possible only then when we can control a single LED
+                // Wait a little bit
+                ros::Duration(single_step_duration).sleep();
+                // Update the head and tail position of the strip
+                head = (head + skip_per_step) % m_numLeds;
+                tail = (head - offset);
+                if(tail < 0) tail = tail + m_numLeds;
+                ROS_INFO("New tail: %d | old tail: %d", tail, old_tail);
+                // Turn off all LEDs between the old end position and the new end position of the strip
+                m_led->setRangeRGBf(0, 0, 0, m_numLeds, old_tail, tail);
 
-                ROS_INFO("[%d] : (head[%d] - tail[%d])\tsplit %s", counter, _head, _tail_non_negative, split ? "+" : "-");
+                old_tail = tail;
 
-                if(split) {
-                    ROS_INFO("\t\t\\_________(head[%d] - split[%d] | after_split[%d] - tail[%d])\n", _head, _splitPos, _after_split, _tail_non_negative);
-                    //m_led->setRangeRGBf(r, g, b, m_numLeds, _tail_non_negative, _after_split);   // We finish the current LED stripe (x->422)
-                    //m_led->setRangeRGBf(r, g, b, m_numLeds, _splitPos, _head);                   // Then we start the next (0->y)
-                    ROS_INFO("Turning off LEDs %d to %d", _head+1, _tail_non_negative-1);
-                    //m_led->setRangeRGBf(0, 0, 0, m_numLeds, _head+1, _tail_non_negative-1);      // And finally we turn "off" all (y+1->x-1) (I've noticed that when we overlap LEDs it screws up things)
-                } else {
-                    m_led->setRangeRGBf(r, g, b, m_numLeds, _tail_non_negative, _head);
-                    ROS_INFO("Turning off LEDs %d to %d", _tail_non_negative_old, _tail_non_negative);
-                    m_led->setRangeRGBf(0, 0, 0, m_numLeds, _tail_non_negative_old, _tail_non_negative);
-                }
-
-                feedback.current_head_pos = _head;
+                feedback.current_start_pos = head;
                 chaserLightAS.publishFeedback(feedback);
-
-                _head = (_head + goal->skip_leds_per_step) % m_numLeds;
-                _tail = _head - body;
-                _tail_non_negative_old = _tail_non_negative-1;
             }
-
-            ROS_INFO("circle %d completed", circle);
         }
 
-        // Test movement for a single LED ("good" range)
-        /*for(int i = 10; i < 200; i++) {
-            m_led->setRangeRGBf(r, g, b, m_numLeds, i-1, i);
-            m_led->setAllRGBf(0, 0, 0, m_numLeds);
-        }*/
-
         m_led->setAllRGBf(0, 0, 0, m_numLeds);
-        feedback.current_head_pos = head;
+        feedback.current_start_pos = head;
         chaserLightAS.publishFeedback(feedback);
-        result.current_head_pos = head;
+        result.current_start_pos = head;
         chaserLightAS.setSucceeded(result);
     }
 
-    /**
-     * @brief chaserLightCallback processes RunningBunnyGoal messages - a given stripe of LEDs (bunny) "jumps" in circle (a jump is defined as the number of LEDs that are skipped by the bunny); previous name: lightActionCallback_6 with argument std_msgs::Float32MultiArray::ConstPtr&
-     * @param goal
-     */
+    // OLD VERSION (also uses the old RunningBunny format
+//    void chaserLightCallback(const iirob_led::ChaserLightGoal::ConstPtr& goal) {
+//        iirob_led::ChaserLightFeedback feedback;
+//        iirob_led::ChaserLightResult result;
+
+//        int head = goal->head;
+//        int body = goal->body;
+//        float r = goal->color.r;
+//        float g = goal->color.g;
+//        float b = goal->color.b;
+//        int counter = 0;
+//        int circles = goal->num_circles;
+//        bool split = false;
+//        int _splitPos = 0;
+//        int _after_split = m_numLeds-1;
+//        int _head, _tail = head - body;
+//        int _tail_non_negative = (_tail < 0) ? _tail + m_numLeds : _tail;   //423-1 = 422, 423-2 = 421, 423-3 = 420 ...
+//        int _tail_non_negative_old = _tail_non_negative-1;
+
+
+//        printf("Starting position: (head[%d] - tail[%d])\n-----------------------------------------\n", head, (head - body) % m_numLeds);
+
+//        for(int circle = 0; circle < circles; circle++) {
+//            _head = head;
+//            _tail = head - body;
+//            //_tail_non_negative_old = _tail_non_negative;
+
+//            for(counter = 0; counter < m_numLeds; counter+=goal->skip_leds_per_step) {
+//                //_tail_non_negative_old = _tail_non_negative-1;
+
+//                if(_tail < 0) {
+//                    split = true;
+//                    _tail_non_negative = _tail + m_numLeds;
+//                } else {
+//                    split = false;
+//                    _tail_non_negative = _tail;
+//                }
+
+//                ROS_INFO("[%d] : (head[%d] - tail[%d])\tsplit %s", counter, _head, _tail_non_negative, split ? "+" : "-");
+
+//                if(split) {
+//                    ROS_INFO("\t\t\\_________(head[%d] - split[%d] | after_split[%d] - tail[%d])\n", _head, _splitPos, _after_split, _tail_non_negative);
+//                    //m_led->setRangeRGBf(r, g, b, m_numLeds, _tail_non_negative, _after_split);   // We finish the current LED stripe (x->422)
+//                    //m_led->setRangeRGBf(r, g, b, m_numLeds, _splitPos, _head);                   // Then we start the next (0->y)
+//                    ROS_INFO("Turning off LEDs %d to %d", _head+1, _tail_non_negative-1);
+//                    //m_led->setRangeRGBf(0, 0, 0, m_numLeds, _head+1, _tail_non_negative-1);      // And finally we turn "off" all (y+1->x-1) (I've noticed that when we overlap LEDs it screws up things)
+//                } else {
+//                    m_led->setRangeRGBf(r, g, b, m_numLeds, _tail_non_negative, _head);
+//                    ROS_INFO("Turning off LEDs %d to %d", _tail_non_negative_old, _tail_non_negative);
+//                    m_led->setRangeRGBf(0, 0, 0, m_numLeds, _tail_non_negative_old, _tail_non_negative);
+//                }
+
+//                feedback.current_head_pos = _head;
+//                chaserLightAS.publishFeedback(feedback);
+
+//                _head = (_head + goal->skip_leds_per_step) % m_numLeds;
+//                _tail = _head - body;
+//                _tail_non_negative_old = _tail_non_negative-1;
+//            }
+
+//            ROS_INFO("circle %d completed", circle);
+//        }
+
+//        // Test movement for a single LED ("good" range)
+//        /*for(int i = 10; i < 200; i++) {
+//            m_led->setRangeRGBf(r, g, b, m_numLeds, i-1, i);
+//            m_led->setAllRGBf(0, 0, 0, m_numLeds);
+//        }*/
+
+//        m_led->setAllRGBf(0, 0, 0, m_numLeds);
+//        feedback.current_head_pos = head;
+//        chaserLightAS.publishFeedback(feedback);
+//        result.current_head_pos = head;
+//        chaserLightAS.setSucceeded(result);
+//    }
+
     /* OLD VERSION
      void runningBunnyCallback(const iirob_led::RunningBunnyGoal::ConstPtr& goal) {
         // TODO Use modulo to create a neat transition between previous and next circle!
