@@ -257,9 +257,12 @@ std::vector<float> LEDStrip::hueToRGB(float hue) {
 
 /////////////////////////////////////// NEW FEATURES ////////////////////////////////////////
 // Methods for modifying individual parts of the strip
-bool LEDStrip::setXRangeRGB(unsigned char* rgb, int numLeds, int start_led, int end_led, bool log) {
-    if ((numLeds*3+4)>sizeof(buf))
-		return false;
+bool LEDStrip::setXRangeRGB(unsigned char* rgb, int numLeds, int start_led, int end_led, bool log, bool checkLimits) {
+    // We make this an optional step to avoid jumping to checkRange() when not required/wanted
+    if(checkLimits) {
+        if ((numLeds*3+4) > sizeof(buf)) return false;
+        if(!withinRange(numLeds, start_led, end_led)) return false;  // FIXME
+    }
 
     bool ok = true;
 	buf[0] = LEDStrip::START;
@@ -277,9 +280,13 @@ bool LEDStrip::setXRangeRGB(unsigned char* rgb, int numLeds, int start_led, int 
     return ok;
 }
 
-bool LEDStrip::setRangeRGB(unsigned char red, unsigned char green, unsigned char blue, int numLeds, int start_led, int end_led, bool log) {
-    if (numLeds*3 > sizeof(rgbtemp))
-        return false;
+bool LEDStrip::setRangeRGB(unsigned char red, unsigned char green, unsigned char blue, int numLeds, int start_led, int end_led, bool log, bool checkLimits) {
+    // We call these two lines here again because someone might want to call setRangeRGB() directly and not use setRangeRGBf(). However we make this an optional step to avoid jumping
+    // to checkRange() when not required/wanted
+    if(checkLimits) {
+        if (numLeds*3 > sizeof(rgbtemp)) return false;
+        if(!withinRange(numLeds, start_led, end_led)) return false;  // FIXME
+    }
 
     for (int i = 0; i<(numLeds*3); i+=3) {
 #ifdef THREEWIRE
@@ -295,12 +302,21 @@ bool LEDStrip::setRangeRGB(unsigned char red, unsigned char green, unsigned char
 
     // Case when the starting LED and the ending one are the same - due to the way the loop inside setXRangeRGB() works, we need at least a difference of 1 between both so that it can actually be
     // executed hence we add +1 to the end_led here for lighing up a single LED at position start_led
-    if(start_led == end_led) end_led++;
+    // FIXME Investigate the case when start = end (light up a single LED)
+    if(start_led == end_led) {
+        if(end_led >= numLeds) {
+            start_led = numLeds;
+            end_led = 0;
+        }
+        else end_led++;
+    }
 
     if(start_led > end_led) {
         // Case when the starting LED comes after the ending one - this happens when a transition [last LED index -> first LED index] occurs
         // In this situation we split the range into two parts - one is from start_led to last LED and the other one - from first LED to end_led
         bool firstRange = setXRangeRGB(rgbtemp, numLeds, start_led, numLeds, log);
+        // FIXME Investigate the case when end = 0 and we split into two calls of setXRangeRGB()
+        if(end_led == 0) end_led++; // Cover the case where we have end_led = 0 - other wise we get setXRangeRGB() from 0 to 0, which leads to error
         bool secondRange = setXRangeRGB(rgbtemp, numLeds, 0, end_led, log);
 
         return firstRange && secondRange;
@@ -313,10 +329,20 @@ bool LEDStrip::setRangeRGB(unsigned char red, unsigned char green, unsigned char
     //return setXRangeRGB(rgbtemp, numLeds, start_led, end_led, log);
 }
 
-bool LEDStrip::setRangeRGBf(float red, float green, float blue, int n, int start_led, int end_led, bool log) {
-    if (n*3>sizeof(rgbtemp))
-        return false;
+bool LEDStrip::setRangeRGBf(float red, float green, float blue, int n, int start_led, int end_led, bool log, bool checkLimits) {
+    // We make this an optional step to avoid jumping to checkRange() when not required/wanted
+    if(checkLimits) {
+        if (n*3 > sizeof(rgbtemp)) return false;
+        if(!withinRange(n, start_led, end_led)) return false; // FIXME
+    }
 
     return LEDStrip::setRangeRGB((unsigned char)(red*255.0), (unsigned char)(green*255.0),
             (unsigned char)(blue*255.0), n, start_led, end_led, log);
+}
+
+bool LEDStrip::withinRange(int totNumLeds, int start_led, int end_led) {
+    // Check if start_led and end_led are withing the allowed range
+    if(start_led < 0 || end_led < 0) return false;  // Underflow
+    if(start_led > totNumLeds || end_led > totNumLeds) return false; // Overflow
+    return true;
 }

@@ -59,13 +59,15 @@ namespace iirob_hardware {
 		std::vector<float> hueToRGB(float hue);
 
         /////////////////////////////////////// NEW FEATURES ////////////////////////////////////////
-        /** Methods for modifying individual parts of the strip */
-        bool setXRangeRGB(unsigned char* rgb, int totNumLeds, int start_led, int end_led, bool log=false);
-        /** Set RGB value of all leds */
-        bool setRangeRGB(unsigned char red, unsigned char green, unsigned char blue, int totNumLeds, int start_led, int end_led, bool log=true);
-        /** As above, float [0.1], opt. logarithmic scaling */
-        bool setRangeRGBf(float red, float green, float blue, int totNumLeds, int start_led, int end_led, bool log=true);
+        /** Check if start and end are withing the allowed limits for the LED array */
+        bool withinRange(int totNumLeds, int start_led, int end_led);
 
+        /** Methods for modifying individual parts of the strip */
+        bool setXRangeRGB(unsigned char* rgb, int totNumLeds, int start_led, int end_led, bool log=false, bool checkLimits=true);
+        /** Set RGB value of all leds */
+        bool setRangeRGB(unsigned char red, unsigned char green, unsigned char blue, int totNumLeds, int start_led, int end_led, bool log=true, bool checkLimits=false);
+        /** As above, float [0.1], opt. logarithmic scaling */
+        bool setRangeRGBf(float red, float green, float blue, int totNumLeds, int start_led, int end_led, bool log=true, bool checkLimits=true);
 
 	private:
 		LEDStrip() {}

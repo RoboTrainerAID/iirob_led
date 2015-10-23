@@ -36,10 +36,10 @@ const int short_side = 84;
 const int led_start = 0;
 const int led_end = 2*long_side + 2*short_side;
 
-const int led_corner_front_right = short_side;
+const int led_corner_front_right = led_end;
+const int led_corner_front_left = short_side;
 const int led_corner_back_right = short_side + long_side;
 const int led_corner_back_left = short_side + 2*long_side;
-const int led_corner_front_left = led_end;
 
 // TODO override - when ready set to false
 // TODO Check return value for all iirob::hardware functions (setAllRGBf(), setRangeRGBf() etc.)
@@ -203,16 +203,16 @@ public:
             // If X and Y are equal to 0 we cannot determine the corner hence no point in displaying anything
             return;
         case QUADRANT_FIRST:
-            corner = CORNER_FRONT_RIGHT;
+            corner = led_corner_front_right;
             break;
         case QUADRANT_SECOND:
-            corner = CORNER_FRONT_LEFT;
+            corner = led_corner_front_left;
             break;
         case QUADRANT_THIRD:
-            corner = CORNER_BACK_LEFT;
+            corner = led_corner_back_left;
             break;
         case QUADRANT_FOURTH:
-            corner = CORNER_BACK_RIGHT;
+            corner = led_corner_back_right;
             break;
         }
 
@@ -226,29 +226,47 @@ public:
          *           [forceRoundend]
          */
 
+        // Counting direction is again but starting from the last LED: 384, 0, 1, ... , 383
+        int rangeBeforeCorner;
+        int rangeAfterCorner;
         switch(corner) {
-        case CORNER_FRONT_RIGHT:
-            // Example: forceRounded = 5, CORNER_FRONT_RIGHT = 300
-            // From 300 - 5 = 255 to 299 [LEDs: 255, 296, 297, 298, 299]
-            // From 300 to 300 + 4 = 304 [LEDs: 300, 301, 302, 303, 304]
-            m_led->setRangeRGBf(1, 0, 0, m_numLeds, corner-forceRounded, corner);
-            ROS_INFO("Corner: front right | from %d to %d", corner-forceRounded, corner);
-            m_led->setRangeRGBf(0, 0, 1, m_numLeds, corner, corner+forceRounded);
-            ROS_INFO("Corner: front right | from %d to %d", corner, corner+forceRounded);
+        case led_corner_front_right:
+            ROS_INFO("CORNER_FRONT_RIGHT");
+            if(forceRounded == 1) m_led->setRangeRGBf(1, 0, 0, m_numLeds, 380, 380);
+            else {
+                // Reduce the forceRound by one since the corner will display part of it
+                forceRounded -= 1;
+                // front to corner
+                rangeBeforeCorner = corner - forceRounded;
+                m_led->setRangeRGBf(1, 1, 1, m_numLeds, 380, 384);
+                ROS_INFO("[%d : %d)", corner-forceRounded, corner);
+                //m_led->setRangeRGBf(1, 1, 1, m_numLeds, corner-forceRounded, corner);
+                // corner
+                ROS_INFO("[%d]", corner);
+                //m_led->setRangeRGBf(0, 1, 0, m_numLeds, corner, corner);
+                // corner to back
+                ROS_INFO("(%d : %d]", corner, corner+forceRounded);
+                //m_led->setRangeRGBf(1, 0, 0, m_numLeds, corner+1, corner+forceRounded);
+            }
             break;
-        case CORNER_FRONT_LEFT:
+
+            // TODO CASES
+        case led_corner_front_left:
+            ROS_INFO("CORNER_FRONT_LEFT");
             m_led->setRangeRGBf(0, 0, 1, m_numLeds, corner, corner+forceRounded);
             ROS_INFO("Corner: front left | from %d to %d", corner, corner+forceRounded);
             m_led->setRangeRGBf(1, 0, 0, m_numLeds, m_numLeds-forceRounded, m_numLeds-1);
             ROS_INFO("Corner: front left | from %d to %d", m_numLeds-forceRounded, m_numLeds-1);
             break;
-        case CORNER_BACK_LEFT:
+        case led_corner_back_left:
+            ROS_INFO("CORNER_BACK_LEFT");
             m_led->setRangeRGBf(1, 0, 0, m_numLeds, corner-forceRounded, corner);
             ROS_INFO("Corner: back left | from %d to %d", corner-forceRounded, corner);
             m_led->setRangeRGBf(0, 0, 1, m_numLeds, corner, corner+forceRounded);
             ROS_INFO("Corner: back left | from %d to %d", corner, corner+forceRounded);
             break;
-        case CORNER_BACK_RIGHT:
+        case led_corner_back_right:
+            ROS_INFO("CORNER_BACK_RIGHT");
             m_led->setRangeRGBf(1, 0, 0, m_numLeds, corner-forceRounded, corner);
             ROS_INFO("Corner: back right | from %d to %d", corner-forceRounded, corner);
             m_led->setRangeRGBf(0, 0, 1, m_numLeds, corner, corner+forceRounded);
