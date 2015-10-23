@@ -255,34 +255,7 @@ std::vector<float> LEDStrip::hueToRGB(float hue) {
 	return rgb;
 }
 
-/////////////////////////////////////// NEW FEATURES :P ////////////////////////////////////////
-bool LEDStrip::setXSingleRGB(unsigned char* rgb, int numLeds, int index, bool log) {
-  if(index > numLeds) // Out of range
-      return false;
-
-  if ((numLeds*3+4)>sizeof(buf))
-      return false;
-
-  // TODO Light up single LED at position INDEX
-  if ((numLeds*3+4)>sizeof(buf))
-      return false;
-
-  bool ok = true;
-  buf[0] = LEDStrip::START;
-  buf[1] = (char)(numLeds>>8);
-  buf[2] = (char)numLeds;
-
-  for (int i = (index*3)+3; i < (index*3)+3; i++)
-      buf[i] = log ? led_lut[*rgb++] : *rgb++;
-
-  buf[numLeds*3+3] = LEDStrip::END;
-  ok &= send(buf, numLeds*3+4);
-  ok &= receive(buf, 1);
-  ok &= (buf[0]==LEDStrip::OK);
-
-  return ok;
-}
-
+/////////////////////////////////////// NEW FEATURES ////////////////////////////////////////
 // Methods for modifying individual parts of the strip
 bool LEDStrip::setXRangeRGB(unsigned char* rgb, int numLeds, int start_led, int end_led, bool log) {
     if ((numLeds*3+4)>sizeof(buf))
@@ -320,6 +293,10 @@ bool LEDStrip::setRangeRGB(unsigned char red, unsigned char green, unsigned char
 #endif
     }
 
+    // Case when the starting LED and the ending one are the same - due to the way the loop inside setXRangeRGB() works, we need at least a difference of 1 between both so that it can actually be
+    // executed hence we add +1 to the end_led here for lighing up a single LED at position start_led
+    if(start_led == end_led) end_led++;
+
     if(start_led > end_led) {
         // Case when the starting LED comes after the ending one - this happens when a transition [last LED index -> first LED index] occurs
         // In this situation we split the range into two parts - one is from start_led to last LED and the other one - from first LED to end_led
@@ -328,19 +305,9 @@ bool LEDStrip::setRangeRGB(unsigned char red, unsigned char green, unsigned char
 
         return firstRange && secondRange;
     }
-    else if (start_led < end_led) {
+    else if(start_led < end_led) {
         // Case when starting LED comes before the ending one - normal case; nothing special to do here
         return setXRangeRGB(rgbtemp, numLeds, start_led, end_led, log);
-    }
-    else {
-        // Case when starting LED is the same as the ending one - we assume that this is a single LED that we want to light up (otherwise the user would have just called one of the setAllRGB() methods)
-        // Currently I don't know how to turn on a single LED at a specific location.
-        // Either turn on a single LED or turn on all LEDs (setAllRGB())
-
-        // For now we say that all LEDs will be lit up
-        // start_led = end_led = index of LED that is to be lit up
-        return setXSingleRGB(rgbtemp, start_led, log);
-        //return setRGB(rgbtemp, 10, log); // Turn on all LEDs
     }
 
     //return setXRangeRGB(rgbtemp, numLeds, start_led, end_led, log);

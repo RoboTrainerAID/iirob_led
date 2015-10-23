@@ -58,9 +58,7 @@ namespace iirob_hardware {
 		/** Returns RGB for hue value [0,1] (S,V = 1.0) */
 		std::vector<float> hueToRGB(float hue);
 
-        /////////////////////////////////////// NEW FEATURES :P ////////////////////////////////////////
-        /** Sets a single LED at the given index to the specified RGB color value */
-        bool setXSingleRGB(unsigned char* rgb, int totNumLeds, int index, bool log=true);
+        /////////////////////////////////////// NEW FEATURES ////////////////////////////////////////
         /** Methods for modifying individual parts of the strip */
         bool setXRangeRGB(unsigned char* rgb, int totNumLeds, int start_led, int end_led, bool log=false);
         /** Set RGB value of all leds */
