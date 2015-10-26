@@ -2,6 +2,7 @@
 #include "../SERIAL/SerialPortFactory.h"
 
 #include <cstdio>
+#include <iostream>
 #include <cmath>
 
 #define THREEWIRE
@@ -261,7 +262,7 @@ bool LEDStrip::setXRangeRGB(unsigned char* rgb, int numLeds, int start_led, int 
     // We make this an optional step to avoid jumping to checkRange() when not required/wanted
     if(checkLimits) {
         if ((numLeds*3+4) > sizeof(buf)) return false;
-        if(!withinRange(numLeds, start_led, end_led)) return false;  // FIXME
+        if(!withinRange(numLeds, start_led, end_led)) return false;
     }
 
     bool ok = true;
@@ -285,13 +286,16 @@ bool LEDStrip::setRangeRGB(unsigned char red, unsigned char green, unsigned char
     // to checkRange() when not required/wanted
     if(checkLimits) {
         if (numLeds*3 > sizeof(rgbtemp)) return false;
-        if(!withinRange(numLeds, start_led, end_led)) return false;  // FIXME
+        if(!withinRange(numLeds, start_led, end_led)) return false;
     }
 
     for (int i = 0; i<(numLeds*3); i+=3) {
 #ifdef THREEWIRE
+        //std::cout << "rgbtemp[" << i << "] = green (" << (char)green <<  ")" << std::endl;
         rgbtemp[i]   = green;
+        //std::cout << "rgbtemp[" << i << "] = red (" << (char)red <<  ")" << std::endl;
         rgbtemp[i+1] = red;
+        //std::cout << "rgbtemp[" << i << "] = blue (" << (char)blue <<  ")" << std::endl;
         rgbtemp[i+2] = blue;
 #else
         rgbtemp[i]   = blue;
@@ -304,36 +308,48 @@ bool LEDStrip::setRangeRGB(unsigned char red, unsigned char green, unsigned char
     // executed hence we add +1 to the end_led here for lighing up a single LED at position start_led
     // FIXME Investigate the case when start = end (light up a single LED)
     if(start_led == end_led) {
+        std::cout << "*********************** START == END" << std::endl;
         if(end_led >= numLeds) {
+            std::cout << "*********************** END = " << end_led << " >= " << numLeds << std::endl;
             start_led = numLeds;
             end_led = 0;
         }
-        else end_led++;
+        else {
+            std::cout << "*********************** END = " << end_led << " < " << numLeds << " | Increasing end_led to " << end_led+1 << std::endl;
+            end_led++;
+        }
+
+        return setXRangeRGB(rgbtemp, numLeds, start_led, start_led, log);
     }
 
     if(start_led > end_led) {
+        // TODO Splitting into two calls leads to noticable delays. Try to merge both ranges into a single one and send it via single call.
+        std::cout << "START > END" << std::endl;
         // Case when the starting LED comes after the ending one - this happens when a transition [last LED index -> first LED index] occurs
         // In this situation we split the range into two parts - one is from start_led to last LED and the other one - from first LED to end_led
+        std::cout << "FIRST RANGE: from " << start_led << " to " << numLeds << std::endl;
         bool firstRange = setXRangeRGB(rgbtemp, numLeds, start_led, numLeds, log);
         // FIXME Investigate the case when end = 0 and we split into two calls of setXRangeRGB()
         if(end_led == 0) end_led++; // Cover the case where we have end_led = 0 - other wise we get setXRangeRGB() from 0 to 0, which leads to error
+        std::cout << "SECOND RANGE: from " << 0 << " to " << end_led << std::endl;
         bool secondRange = setXRangeRGB(rgbtemp, numLeds, 0, end_led, log);
 
         return firstRange && secondRange;
     }
     else if(start_led < end_led) {
         // Case when starting LED comes before the ending one - normal case; nothing special to do here
+        std::cout << "START < END" << std::endl;
         return setXRangeRGB(rgbtemp, numLeds, start_led, end_led, log);
     }
 
-    //return setXRangeRGB(rgbtemp, numLeds, start_led, end_led, log);
+    return setXRangeRGB(rgbtemp, numLeds, start_led, end_led, log);
 }
 
 bool LEDStrip::setRangeRGBf(float red, float green, float blue, int n, int start_led, int end_led, bool log, bool checkLimits) {
     // We make this an optional step to avoid jumping to checkRange() when not required/wanted
     if(checkLimits) {
         if (n*3 > sizeof(rgbtemp)) return false;
-        if(!withinRange(n, start_led, end_led)) return false; // FIXME
+        if(!withinRange(n, start_led, end_led)) return false;
     }
 
     return LEDStrip::setRangeRGB((unsigned char)(red*255.0), (unsigned char)(green*255.0),
@@ -342,7 +358,7 @@ bool LEDStrip::setRangeRGBf(float red, float green, float blue, int n, int start
 
 bool LEDStrip::withinRange(int totNumLeds, int start_led, int end_led) {
     // Check if start_led and end_led are withing the allowed range
-    if(start_led < 0 || end_led < 0) return false;  // Underflow
+    if(start_led < 0 || end_led < 0) return false;                   // Underflow
     if(start_led > totNumLeds || end_led > totNumLeds) return false; // Overflow
     return true;
 }

@@ -46,7 +46,7 @@ generate_messages(
 )
 
 catkin_package(
- INCLUDE_DIRS common/LED common/SERIAL
+ INCLUDE_DIRS common/LED common/SERIAL common/RGBCONVERTER include/iirob_led
  LIBRARIES ${PROJECT_NAME}
  CATKIN_DEPENDS actionlib actionlib_msgs message_runtime roscpp std_msgs geometry_msgs
  DEPENDS system_lib
@@ -56,6 +56,7 @@ include_directories(
   common/LED
   common/SERIAL
   common/RGBCONVERTER
+  include/iirob_led
   ${catkin_INCLUDE_DIRS}
 )
 
@@ -64,24 +65,23 @@ add_definitions(-DIIROB_EXPORT=)
 ###########
 ## Build ##
 ###########
-
-add_library(${PROJECT_NAME}
+# The ledcommon library contains all that is required to control the underlying hardware
+add_library(ledcommon
   common/LED/LEDStrip.cpp
   common/LED/LEDModul.cpp
   common/SERIAL/SerialPort.cpp
   common/SERIAL/PosixSerialPort.cpp
   common/SERIAL/SerialPortFactory.cpp
 )
-
+# The rgbconverter contains methods for manipulating colour data
 add_library(rgbconverter common/RGBCONVERTER/RGBConverter.cpp)
+# The iirob_ledstrip contains functionality for controlling the SR2 LED strip using ROS
+add_library(iirob_ledstrip src/iirob_led_strip.cpp)
+target_link_libraries(iirob_ledstrip rgbconverter ledcommon)
 
 add_executable(${PROJECT_NAME}_node src/iirob_led_node.cpp)
 add_dependencies(${PROJECT_NAME}_node ${PROJECT_NAME}_generate_messages_cpp)
-target_link_libraries(${PROJECT_NAME}_node
-  ${PROJECT_NAME}
-  rgbconverter
-  ${catkin_LIBRARIES}
-)
+target_link_libraries(${PROJECT_NAME}_node iirob_ledstrip ${catkin_LIBRARIES})
 
 #add_executable(${PROJECT_NAME}_node_client_test src/iirob_led_node_client_test.cpp)
 #add_dependencies(${PROJECT_NAME}_node_client_test ${PROJECT_NAME}_generate_messages_cpp)
@@ -95,7 +95,7 @@ target_link_libraries(${PROJECT_NAME}_node
 ## Install ##
 #############
 
-install(TARGETS ${PROJECT_NAME} ${PROJECT_NAME}_node
+install(TARGETS ledcommon rgbconverter iirob_ledstrip ${PROJECT_NAME}_node
   ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
   LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
   RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
