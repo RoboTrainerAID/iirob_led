@@ -273,7 +273,10 @@ bool LEDStrip::setXRangeRGB(unsigned char* rgb, int numLeds, int start_led, int 
     for (int i = (start_led*3)+3; i <= (end_led*3)+3+3; i++) // Additional +3 and <= instead of <
         buf[i] = log ? led_lut[*rgb++] : *rgb++;
 
+<<<<<<< HEAD
     // TODO See how to directly access the array without any loops (best way to do things whenever we need to access a single LED)
+=======
+>>>>>>> f8a189318c42c0f6fa31f1214156cf39f16df03c
 //    buf[(index*3)+1] = led_lut[*rgb];
 //    buf[(index*3)+2] = led_lut[*rgb+1];
 //    buf[(index*3)+3] = led_lut[*rgb+2];
