@@ -270,8 +270,13 @@ bool LEDStrip::setXRangeRGB(unsigned char* rgb, int numLeds, int start_led, int 
     buf[1] = (char)(numLeds>>8);
     buf[2] = (char)numLeds;
 
-    for (int i = (start_led*3)+3; i < (end_led*3)+3; i++)
+    for (int i = (start_led*3)+3; i <= (end_led*3)+3+3; i++) // Additional +3 and <= instead of <
         buf[i] = log ? led_lut[*rgb++] : *rgb++;
+
+    // TODO See how to directly access the array without any loops (best way to do things whenever we need to access a single LED)
+//    buf[(index*3)+1] = led_lut[*rgb];
+//    buf[(index*3)+2] = led_lut[*rgb+1];
+//    buf[(index*3)+3] = led_lut[*rgb+2];
 
     buf[numLeds*3+3] = LEDStrip::END;
     ok &= send(buf, numLeds*3+4);
@@ -307,7 +312,7 @@ bool LEDStrip::setRangeRGB(unsigned char red, unsigned char green, unsigned char
     // Case when the starting LED and the ending one are the same - due to the way the loop inside setXRangeRGB() works, we need at least a difference of 1 between both so that it can actually be
     // executed hence we add +1 to the end_led here for lighing up a single LED at position start_led
     // FIXME Investigate the case when start = end (light up a single LED)
-    if(start_led == end_led) {
+    /*if(start_led == end_led) {
         std::cout << "*********************** START == END" << std::endl;
         if(end_led >= numLeds) {
             std::cout << "*********************** END = " << end_led << " >= " << numLeds << std::endl;
@@ -320,7 +325,7 @@ bool LEDStrip::setRangeRGB(unsigned char red, unsigned char green, unsigned char
         }
 
         return setXRangeRGB(rgbtemp, numLeds, start_led, start_led, log);
-    }
+    }*/
 
     if(start_led > end_led) {
         // TODO Splitting into two calls leads to noticable delays. Try to merge both ranges into a single one and send it via single call.
@@ -330,7 +335,7 @@ bool LEDStrip::setRangeRGB(unsigned char red, unsigned char green, unsigned char
         std::cout << "FIRST RANGE: from " << start_led << " to " << numLeds << std::endl;
         bool firstRange = setXRangeRGB(rgbtemp, numLeds, start_led, numLeds, log);
         // FIXME Investigate the case when end = 0 and we split into two calls of setXRangeRGB()
-        if(end_led == 0) end_led++; // Cover the case where we have end_led = 0 - other wise we get setXRangeRGB() from 0 to 0, which leads to error
+        //if(end_led == 0) end_led++; // Cover the case where we have end_led = 0 - other wise we get setXRangeRGB() from 0 to 0, which leads to error
         std::cout << "SECOND RANGE: from " << 0 << " to " << end_led << std::endl;
         bool secondRange = setXRangeRGB(rgbtemp, numLeds, 0, end_led, log);
 
