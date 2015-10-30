@@ -271,7 +271,7 @@ bool LEDStrip::setXRangeRGB(unsigned char* rgb, int numLeds, int start_led, int 
     buf[1] = (char)(numLeds>>8);
     buf[2] = (char)numLeds;
 
-    for (int i = (start_led*3)+3; i <= (end_led*3)+3+3; i++) // Additional +3 and <= instead of <
+    for (int i = (start_led*3)+3; i <= (end_led*3)+3+2; i++) // Additional +3 and <= instead of <
         buf[i] = log ? led_lut[*rgb++] : *rgb++;
 
 
@@ -298,11 +298,8 @@ bool LEDStrip::setRangeRGB(unsigned char red, unsigned char green, unsigned char
 
     for (int i = 0; i<(numLeds*3); i+=3) {
 #ifdef THREEWIRE
-        //std::cout << "rgbtemp[" << i << "] = green (" << (char)green <<  ")" << std::endl;
         rgbtemp[i]   = green;
-        //std::cout << "rgbtemp[" << i << "] = red (" << (char)red <<  ")" << std::endl;
         rgbtemp[i+1] = red;
-        //std::cout << "rgbtemp[" << i << "] = blue (" << (char)blue <<  ")" << std::endl;
         rgbtemp[i+2] = blue;
 #else
         rgbtemp[i]   = blue;

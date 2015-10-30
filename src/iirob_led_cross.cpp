@@ -1,17 +1,17 @@
 #include <cmath>
-#include "iirob_led_strip.h"
+#include "iirob_led_cross.h"
 #include "RGBConverter.h"
 
 // TODO Check if everywhere the duration parameter of a message is set properly (value > 0). Otherwise duration takes the default value from the message (=0), which equals infinity and node can only be stopped by escalating to SIGTERM
 
-IIROB_LED_Strip::IIROB_LED_Strip(ros::NodeHandle nodeHandle, std::string const& _port, int const& _m_numLeds)
+IIROB_LED_Cross::IIROB_LED_Cross(ros::NodeHandle nodeHandle, std::string const& _port, int const& _m_numLeds)
     : m_led(0), m_msec(1),
       port(_port), m_numLeds(_m_numLeds),
       // Initialize all action servers and bind them to the respective callbacks
-      blinkyAS(nodeHandle, "blinky", boost::bind(&IIROB_LED_Strip::blinkyCallback, this, _1), false),
-      policeAS(nodeHandle, "police", boost::bind(&IIROB_LED_Strip::policeCallback, this, _1), false),
-      fourRegionsAS(nodeHandle, "four_regions", boost::bind(&IIROB_LED_Strip::fourRegionsCallback, this, _1), false),
-      chaserLightAS(nodeHandle, "chaser_light", boost::bind(&IIROB_LED_Strip::chaserLightCallback, this, _1), false),
+      blinkyAS(nodeHandle, "blinky", boost::bind(&IIROB_LED_Cross::blinkyCallback, this, _1), false),
+      policeAS(nodeHandle, "police", boost::bind(&IIROB_LED_Cross::policeCallback, this, _1), false),
+      fourRegionsAS(nodeHandle, "four_regions", boost::bind(&IIROB_LED_Cross::fourRegionsCallback, this, _1), false),
+      chaserLightAS(nodeHandle, "chaser_light", boost::bind(&IIROB_LED_Cross::chaserLightCallback, this, _1), false),
       MAX_FORCE(10)
 {
     // Initialize the hardware
@@ -24,10 +24,10 @@ IIROB_LED_Strip::IIROB_LED_Strip(ros::NodeHandle nodeHandle, std::string const& 
     }
 
     ROS_INFO("led_force subscriber started");
-    subForce = nodeHandle.subscribe("led_force", 10, &IIROB_LED_Strip::forceCallback, this);
+    subForce = nodeHandle.subscribe("led_force", 10, &IIROB_LED_Cross::forceCallback, this);
 }
 
-IIROB_LED_Strip::~IIROB_LED_Strip() {
+IIROB_LED_Cross::~IIROB_LED_Cross() {
     ROS_INFO("Turning all LEDs off");
     // Turn all LEDs off and delete the m_led
     if (m_led) {
@@ -44,7 +44,7 @@ IIROB_LED_Strip::~IIROB_LED_Strip() {
     chaserLightAS.shutdown();
 }
 
-void IIROB_LED_Strip::checkLimits(int *start_led, int *end_led) {
+void IIROB_LED_Cross::checkLimits(int *start_led, int *end_led) {
     if(*start_led > m_numLeds) *start_led = m_numLeds;
     else if(*start_led < 0) *start_led = 0;
 
@@ -52,7 +52,7 @@ void IIROB_LED_Strip::checkLimits(int *start_led, int *end_led) {
     else if(*end_led < 0) *end_led = 0;
 }
 
-bool IIROB_LED_Strip::init(std::string const& port, int const& m_numLeds) {
+bool IIROB_LED_Cross::init(std::string const& port, int const& m_numLeds) {
     // Initialize the hardware
     m_led = new iirob_hardware::LEDStrip(port);
     // Start the action servers only if the hardware has been successfully initialized
@@ -76,12 +76,12 @@ bool IIROB_LED_Strip::init(std::string const& port, int const& m_numLeds) {
     return false;
 }
 
-void IIROB_LED_Strip::spin() { ros::spin(); }
+void IIROB_LED_Cross::spin() { ros::spin(); }
 
-bool IIROB_LED_Strip::getStatus() { return status; }
+bool IIROB_LED_Cross::getStatus() { return status; }
 
 // Callbacks for all action servers and subscribers
-void IIROB_LED_Strip::forceCallback(const iirob_led::DirectionWithForce::ConstPtr& led_force_msg) {
+void IIROB_LED_Cross::forceCallback(const iirob_led::DirectionWithForce::ConstPtr& led_force_msg) {
 
     double duration = (led_force_msg->duration <= 0)  ? 5. : led_force_msg->duration;
 
@@ -147,7 +147,7 @@ void IIROB_LED_Strip::forceCallback(const iirob_led::DirectionWithForce::ConstPt
 
     m_led->setRangeRGBf(0, 0, 1, m_numLeds, 383, 383);
     m_led->setRangeRGBf(0, 1, 0, m_numLeds, 108, 108);
-    m_led->setRangeRGBf(0, 0, 1, m_numLeds, 84+108-1, 84+108-1);
+    m_led->setRangeRGBf(0, 1, 0, m_numLeds, 84+108-1, 84+108-1);
     m_led->setRangeRGBf(0, 0, 1, m_numLeds, 84+2*108, 84+2*108);
 
     ros::Duration(duration).sleep();
@@ -209,7 +209,7 @@ void IIROB_LED_Strip::forceCallback(const iirob_led::DirectionWithForce::ConstPt
     ROS_INFO("Corner: front left | from %d to %d", 420, 422);*/
 }
 
-void IIROB_LED_Strip::blinkyCallback(const iirob_led::BlinkyGoal::ConstPtr& goal) {
+void IIROB_LED_Cross::blinkyCallback(const iirob_led::BlinkyGoal::ConstPtr& goal) {
     iirob_led::BlinkyFeedback feedback;
     iirob_led::BlinkyResult result;
     int blinks_left = goal->blinks;
@@ -319,7 +319,7 @@ void IIROB_LED_Strip::blinkyCallback(const iirob_led::BlinkyGoal::ConstPtr& goal
     blinkyAS.setSucceeded(result);
 }
 
-void IIROB_LED_Strip::policeCallback(const iirob_led::PoliceGoal::ConstPtr& goal) {
+void IIROB_LED_Cross::policeCallback(const iirob_led::PoliceGoal::ConstPtr& goal) {
     iirob_led::PoliceFeedback feedback;
     iirob_led::PoliceResult result;
     int blinks_left = goal->blinks;
@@ -406,7 +406,7 @@ void IIROB_LED_Strip::policeCallback(const iirob_led::PoliceGoal::ConstPtr& goal
     policeAS.setSucceeded(result);
 }
 
-void IIROB_LED_Strip::fourRegionsCallback(const iirob_led::FourRegionsGoal::ConstPtr& goal) {
+void IIROB_LED_Cross::fourRegionsCallback(const iirob_led::FourRegionsGoal::ConstPtr& goal) {
     iirob_led::FourRegionsFeedback feedback;
     iirob_led::FourRegionsResult result;
     int blinks_left = goal->blinks;
@@ -476,7 +476,7 @@ void IIROB_LED_Strip::fourRegionsCallback(const iirob_led::FourRegionsGoal::Cons
     fourRegionsAS.setSucceeded(result);
 }
 
-void IIROB_LED_Strip::chaserLightCallback(const iirob_led::ChaserLightGoal::ConstPtr& goal) {
+void IIROB_LED_Cross::chaserLightCallback(const iirob_led::ChaserLightGoal::ConstPtr& goal) {
     iirob_led::ChaserLightFeedback feedback;
     iirob_led::ChaserLightResult result;
 

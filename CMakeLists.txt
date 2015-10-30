@@ -75,13 +75,17 @@ add_library(ledcommon
 )
 # The rgbconverter contains methods for manipulating colour data
 add_library(rgbconverter common/RGBCONVERTER/RGBConverter.cpp)
-# The iirob_ledstrip contains functionality for controlling the SR2 LED strip using ROS
-add_library(iirob_ledstrip src/iirob_led_strip.cpp)
-target_link_libraries(iirob_ledstrip rgbconverter ledcommon)
+# The iirob_led_rectangular contains functionality for controlling the SR2 LED rectangular strip using ROS
+add_library(iirob_led_rectangle src/iirob_led_rectangle.cpp)
+target_link_libraries(iirob_led_rectangle rgbconverter ledcommon)
+# The iirob_led_cross contains functionality for controlling the SR2 LED cross strip using ROS
+add_library(iirob_led_cross src/iirob_led_cross.cpp)
+target_link_libraries(iirob_led_cross rgbconverter ledcommon)
+
 
 add_executable(${PROJECT_NAME}_node src/iirob_led_node.cpp)
 add_dependencies(${PROJECT_NAME}_node ${PROJECT_NAME}_generate_messages_cpp)
-target_link_libraries(${PROJECT_NAME}_node iirob_ledstrip ${catkin_LIBRARIES})
+target_link_libraries(${PROJECT_NAME}_node iirob_led_rectangle iirob_led_cross ${catkin_LIBRARIES})
 
 #add_executable(${PROJECT_NAME}_node_client_test src/iirob_led_node_client_test.cpp)
 #add_dependencies(${PROJECT_NAME}_node_client_test ${PROJECT_NAME}_generate_messages_cpp)
@@ -95,7 +99,7 @@ target_link_libraries(${PROJECT_NAME}_node iirob_ledstrip ${catkin_LIBRARIES})
 ## Install ##
 #############
 
-install(TARGETS ledcommon rgbconverter iirob_ledstrip ${PROJECT_NAME}_node
+install(TARGETS ledcommon rgbconverter iirob_led_rectangle iirob_led_cross ${PROJECT_NAME}_node
   ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
   LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
   RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
