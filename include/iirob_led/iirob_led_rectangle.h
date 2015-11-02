@@ -10,10 +10,13 @@
 #include <iirob_led/ChaserLightAction.h>
 #include <iirob_led/SetLedDirectory.h>
 #include <iirob_led/DirectionWithForce.h>
+#include <iirob_led/TurnLedsOnOff.h>
 
 #include <std_msgs/String.h>
 #include <std_msgs/ColorRGBA.h>
 #include <geometry_msgs/Vector3.h>
+#include <tf2_ros/buffer.h>
+#include <tf2_ros/transform_listener.h>
 
 #include "LEDStrip.h"
 
@@ -119,22 +122,17 @@ void ForceTorqueNode::updateFTData(const ros::TimerEvent& event)
 #define QUADRANT_THIRD  3   // 3rd quadrant: -x, -y
 #define QUADRANT_FOURTH 4   // 4th quadrant: +x, -y
 
-// Ruben -> take his caluclations for the LEDs
-#define CORNER_FRONT_LEFT   0
-#define CORNER_BACK_LEFT    108
-#define CORNER_BACK_RIGHT   192
-#define CORNER_FRONT_RIGHT  300
-
 const int long_side = 108;
 const int short_side = 84;
 
 const int led_start = 0;
 const int led_end = 2*long_side + 2*short_side;
 
-const int led_corner_front_right = led_end;
-const int led_corner_front_left = short_side;
-const int led_corner_back_right = short_side + long_side;
-const int led_corner_back_left = short_side + 2*long_side;
+// Note: The indexing starts from 0 and ends at 383 for the recangle. However we need not substrat -1 for all corners due to the alignment of the strips
+const int led_corner_front_right = led_end-1;
+const int led_corner_front_left = long_side;
+const int led_corner_back_right = short_side+long_side-1;
+const int led_corner_back_left = short_side+2*long_side;
 
 // TODO override - when ready set to false
 // TODO forceCallback() needs to light up the corners first and then each side of the chosen corner (work on this AFTER you find a proper way of lighting up a single LED)
@@ -161,7 +159,8 @@ private:
     std::string port;           ///< Serial port
     int num;                    ///< Number of LEDs
 
-    ros::Subscriber subForce;   ///< Gives visual feedback for the magnitude and direction of an applied force (represented as a 3D vector)
+    ros::Subscriber subForce;           ///< Gives visual feedback for the magnitude and direction of an applied force (represented as a 3D vector)
+    ros::Subscriber subTurnLedsOnOff;   ///< Allows setting given range of (or a single) LEDs to a specific color with (0,0,0) being equal to "turn off"
     // Action servers
     actionlib::SimpleActionServer<iirob_led::BlinkyAction> blinkyAS;    ///< Handles Blinky goal messages
     actionlib::SimpleActionServer<iirob_led::PoliceAction> policeAS;    ///< Handles Police goal messages
@@ -209,10 +208,16 @@ public:
 
     // Callbacks for all action servers and subscribers
     /**
-     * @brief forceCallback
+     * @brief forceCallback Retrieves a vector with a TF2 frame and lights up one of the corners of the platform based on the force and its direction represented by the vector
      * @param led_force_msg
      */
     void forceCallback(const iirob_led::DirectionWithForce::ConstPtr& led_force_msg);
+
+    /**
+     * @brief turnLedOnOffCallback Turns on or off a given range of (or a single) LEDs
+     * @param led_onoff_msg
+     */
+    void turnLedOnOffCallback(const iirob_led::TurnLedsOnOff::ConstPtr& led_onoff_msg);
 
     /**
      * @brief blinkyCallback processes BlinkyActionGoal messages - it turns on and off a give stripe of LEDs; previous name: lightActionCallback_2 with argument std_msgs::Float32MultiArray::ConstPtr&

@@ -11,7 +11,7 @@
     <arg name="led_num" value="32" />
     <arg name="override" default="true" />
     <!-- Target: "recangle" | "cross" -->
-    <arg name="target" default="rectangle" />
+    <arg name="target" default="cross" />
 
     <node name="leds" pkg="iirob_led" type="iirob_led_node" output="screen">
         <param name="port" value="$(arg port)" />

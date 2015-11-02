@@ -25,6 +25,8 @@ IIROB_LED_Rectangle::IIROB_LED_Rectangle(ros::NodeHandle nodeHandle, std::string
 
     ROS_INFO("led_force subscriber started");
     subForce = nodeHandle.subscribe("led_force", 10, &IIROB_LED_Rectangle::forceCallback, this);
+    ROS_INFO("led_onoff subscriber started");
+    subTurnLedsOnOff = nodeHandle.subscribe("led_onoff", 10, &IIROB_LED_Rectangle::turnLedOnOffCallback, this);
 }
 
 IIROB_LED_Rectangle::~IIROB_LED_Rectangle() {
@@ -38,6 +40,7 @@ IIROB_LED_Rectangle::~IIROB_LED_Rectangle() {
 
     ROS_INFO("Shutting down all action servers and subscribers");
     subForce.shutdown();
+    subTurnLedsOnOff.shutdown();
     blinkyAS.shutdown();
     policeAS.shutdown();
     fourRegionsAS.shutdown();
@@ -82,9 +85,6 @@ bool IIROB_LED_Rectangle::getStatus() { return status; }
 
 // Callbacks for all action servers and subscribers
 void IIROB_LED_Rectangle::forceCallback(const iirob_led::DirectionWithForce::ConstPtr& led_force_msg) {
-
-    double duration = (led_force_msg->duration <= 0)  ? 5. : led_force_msg->duration;
-
     // Calculate the force
     double x = led_force_msg->force.x;
     double y = led_force_msg->force.y;
@@ -142,21 +142,18 @@ void IIROB_LED_Rectangle::forceCallback(const iirob_led::DirectionWithForce::Con
     // Counting direction is again but starting from the last LED: 384, 0, 1, ... , 383
     int rangeBeforeCorner;
     int rangeAfterCorner;
-
-    // FIXME When calling a single LED with the G colour component on we end up with 2 instead of 1 lit up LED
-
-    m_led->setRangeRGBf(0, 0, 1, m_numLeds, 383, 383);
+    m_led->setRangeRGBf(1, 0, 0, m_numLeds, 383, 383);
     m_led->setRangeRGBf(0, 1, 0, m_numLeds, 108, 108);
-    m_led->setRangeRGBf(0, 1, 0, m_numLeds, 84+108-1, 84+108-1);
-    m_led->setRangeRGBf(0, 0, 1, m_numLeds, 84+2*108, 84+2*108);
+    m_led->setRangeRGBf(0, 0, 1, m_numLeds, 84+108-1, 84+108-1);
+    m_led->setRangeRGBf(1, 1, 0, m_numLeds, 84+2*108, 84+2*108);
 
-    ros::Duration(duration).sleep();
-
+    /*
     m_led->setRangeRGBf(0, 0, 0, m_numLeds, 383, 383);
-    m_led->setRangeRGBf(0, 1, 0, m_numLeds, 108, 108);
+    m_led->setRangeRGBf(0, 0, 0, m_numLeds, 108, 108);
     m_led->setRangeRGBf(0, 0, 0, m_numLeds, 84+108-1, 84+108-1);
     m_led->setRangeRGBf(0, 0, 0, m_numLeds, 84+2*108, 84+2*108);
 
+     */
     /*switch(corner) {
     case led_corner_front_right:
         ROS_INFO("CORNER_FRONT_RIGHT");
@@ -207,6 +204,32 @@ void IIROB_LED_Rectangle::forceCallback(const iirob_led::DirectionWithForce::Con
     ROS_INFO("Corner: front left | from %d to %d", 0, 3);
     m_led->setRangeRGBf(1, 0, 0, m_numLeds, 420, 422);
     ROS_INFO("Corner: front left | from %d to %d", 420, 422);*/
+}
+
+void IIROB_LED_Rectangle::turnLedOnOffCallback(const iirob_led::TurnLedsOnOff::ConstPtr& led_onoff_msg)
+{
+    // Check if all or too many LEDs have been selected
+    if(!led_onoff_msg->color.r && !led_onoff_msg->color.g && !led_onoff_msg->color.b &&
+            ((led_onoff_msg->start_led <= 0 && led_onoff_msg->end_led >= m_numLeds) ||
+             (led_onoff_msg->start_led >= m_numLeds && led_onoff_msg->end_led <= 0)) ||
+              led_onoff_msg->num_leds > m_numLeds) {
+        m_led->setAllRGBf(0, 0, 0, m_numLeds);
+        return;
+    }
+
+    int num_leds = led_onoff_msg->num_leds;
+    int start_led = led_onoff_msg->start_led;
+    int end_led = led_onoff_msg->end_led;
+    checkLimits(&start_led, &end_led);
+    if(num_leds <= m_numLeds && num_leds > 0) {
+        // Use the num_leds as offset from start_led to calculate the new end_led
+        end_led = (start_led + num_leds) % m_numLeds;
+        ROS_WARN("num_leds contains a valid non-zero value and will override end_led");
+    }
+    else
+        ROS_WARN("num_leds contains a non-zero value, which exceeds the total number of available LEDs in the strip. Falling back to end_led.");
+
+    m_led->setRangeRGBf(led_onoff_msg->color.r, led_onoff_msg->color.g, led_onoff_msg->color.b, m_numLeds, start_led, end_led);
 }
 
 void IIROB_LED_Rectangle::blinkyCallback(const iirob_led::BlinkyGoal::ConstPtr& goal) {

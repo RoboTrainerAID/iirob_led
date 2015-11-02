@@ -24,17 +24,15 @@ add_service_files(
 add_message_files(
   FILES
   DirectionWithForce.msg
+  TurnLedsOnOff.msg
 )
 
 add_action_files(
   FILES
-  #PlayLed.action           # ???
-  Blinky.action             # action 2
-  Police.action             # action 3
-  FourRegions.action     # action 4
-  ChaserLight.action       # action 5
-#  Spinner.action            # action 6
-#  Changeling.action         # action 7
+  Blinky.action
+  Police.action
+  FourRegions.action
+  ChaserLight.action
 )
 
 ## Generate added messages and services with any dependencies listed here
@@ -87,6 +85,7 @@ add_executable(${PROJECT_NAME}_node src/iirob_led_node.cpp)
 add_dependencies(${PROJECT_NAME}_node ${PROJECT_NAME}_generate_messages_cpp)
 target_link_libraries(${PROJECT_NAME}_node iirob_led_rectangle iirob_led_cross ${catkin_LIBRARIES})
 
+# Playground using an action client (old version, may need update). Code is to be used only as an example
 #add_executable(${PROJECT_NAME}_node_client_test src/iirob_led_node_client_test.cpp)
 #add_dependencies(${PROJECT_NAME}_node_client_test ${PROJECT_NAME}_generate_messages_cpp)
 #target_link_libraries(${PROJECT_NAME}_node_client_test

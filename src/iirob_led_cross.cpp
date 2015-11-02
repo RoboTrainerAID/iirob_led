@@ -82,9 +82,6 @@ bool IIROB_LED_Cross::getStatus() { return status; }
 
 // Callbacks for all action servers and subscribers
 void IIROB_LED_Cross::forceCallback(const iirob_led::DirectionWithForce::ConstPtr& led_force_msg) {
-
-    double duration = (led_force_msg->duration <= 0)  ? 5. : led_force_msg->duration;
-
     // Calculate the force
     double x = led_force_msg->force.x;
     double y = led_force_msg->force.y;
@@ -143,19 +140,15 @@ void IIROB_LED_Cross::forceCallback(const iirob_led::DirectionWithForce::ConstPt
     int rangeBeforeCorner;
     int rangeAfterCorner;
 
-    // FIXME When calling a single LED with the G colour component on we end up with 2 instead of 1 lit up LED
-
-    m_led->setRangeRGBf(0, 0, 1, m_numLeds, 383, 383);
-    m_led->setRangeRGBf(0, 1, 0, m_numLeds, 108, 108);
-    m_led->setRangeRGBf(0, 1, 0, m_numLeds, 84+108-1, 84+108-1);
-    m_led->setRangeRGBf(0, 0, 1, m_numLeds, 84+2*108, 84+2*108);
-
-    ros::Duration(duration).sleep();
-
     m_led->setRangeRGBf(0, 0, 0, m_numLeds, 383, 383);
-    m_led->setRangeRGBf(0, 1, 0, m_numLeds, 108, 108);
+    m_led->setRangeRGBf(0, 0, 0, m_numLeds, 108, 108);
     m_led->setRangeRGBf(0, 0, 0, m_numLeds, 84+108-1, 84+108-1);
     m_led->setRangeRGBf(0, 0, 0, m_numLeds, 84+2*108, 84+2*108);
+
+    m_led->setRangeRGBf(1, 0, 0, m_numLeds, 383, 383);
+    m_led->setRangeRGBf(0, 1, 0, m_numLeds, 108, 108);
+    m_led->setRangeRGBf(0, 0, 1, m_numLeds, 84+108-1, 84+108-1);
+    m_led->setRangeRGBf(1, 1, 0, m_numLeds, 84+2*108, 84+2*108);
 
     /*switch(corner) {
     case led_corner_front_right:
