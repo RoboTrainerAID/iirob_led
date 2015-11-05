@@ -10,14 +10,14 @@
     <!--<arg name="led_num" value="384" />-->
     <arg name="led_num" value="32" />
     <arg name="override" default="true" />
-    <!-- Target: "recangle" | "cross" -->
-    <arg name="target" default="cross" />
+    <!-- Type: "recangle" | "cross" -->
+    <arg name="type" default="cross" />
 
     <node name="leds" pkg="iirob_led" type="iirob_led_node" output="screen">
         <param name="port" value="$(arg port)" />
         <param name="led_num" value="$(arg led_num)" />
         <param name="override" value="$(arg override)" />
-	<param name="target" type="string" value="$(arg target)" />
+	<param name="type" type="string" value="$(arg target)" />
     </node>
 
 </launch>

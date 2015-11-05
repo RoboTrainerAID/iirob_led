@@ -1,24 +1,13 @@
-#ifndef IIROB_LED_STRIP_H
-#define IIROB_LED_STRIP_H
-#include <ros/ros.h>
-#include <ros/console.h>
-#include <actionlib/server/simple_action_server.h>
-
-#include <iirob_led/BlinkyAction.h>
-#include <iirob_led/PoliceAction.h>
-#include <iirob_led/FourRegionsAction.h>
-#include <iirob_led/ChaserLightAction.h>
-#include <iirob_led/SetLedDirectory.h>
+#ifndef IIROB_LED_RECTANGLE_H
+#define IIROB_LED_RECTANGLE_H
 #include <iirob_led/DirectionWithForce.h>
-#include <iirob_led/TurnLedsOnOff.h>
 
-#include <std_msgs/String.h>
-#include <std_msgs/ColorRGBA.h>
 #include <geometry_msgs/Vector3.h>
 #include <tf2_ros/buffer.h>
 #include <tf2_ros/transform_listener.h>
+#include <geometry_msgs/TransformStamped.h>
 
-#include "LEDStrip.h"
+#include "iirob_led_base.h"
 
 /*
  * NOTES:
@@ -116,71 +105,52 @@ void ForceTorqueNode::updateFTData(const ros::TimerEvent& event)
  *
  */
 
+/*
+ * ============================================================
+ * NOTES:
+ * ============================================================
+ *
+ * SR2 rectangle devided into quadrants:
+ *
+ *   (3rd quadrant)         (2nd quadrant)
+ * CORNER_BACK_LEFT ----- CORNER_FRONT_LEFT
+ *         |                       |
+ *         |           x           |_____________[key switch]
+ *         |    (none quadrant)    |
+ *         |                       |
+ * CORNER_BACK_RIGHT ---- CORNER_FRONT_RIGHT
+ *   (4th quadrant)         (1st quadrant)
+ * QUADRANT_NONE      x = y = 0
+ * QUADRANT_FIRST     1st quadrant: +x, +y
+ * QUADRANT_SECOND    2nd quadrant: -x, +y
+ * QUADRANT_THIRD     3rd quadrant: -x, -y
+ * QUADRANT_FOURTH    4th quadrant: +x, -y
+ */
+
 #define QUADRANT_NONE   0   // x = y = 0
 #define QUADRANT_FIRST  1   // 1st quadrant: +x, +y
 #define QUADRANT_SECOND 2   // 2nd quadrant: -x, +y
 #define QUADRANT_THIRD  3   // 3rd quadrant: -x, -y
 #define QUADRANT_FOURTH 4   // 4th quadrant: +x, -y
 
-const int long_side = 108;
-const int short_side = 84;
-
-const int led_start = 0;
-const int led_end = 2*long_side + 2*short_side;
-
-// Note: The indexing starts from 0 and ends at 383 for the recangle. However we need not substrat -1 for all corners due to the alignment of the strips
-const int led_corner_front_right = led_end-1;
-const int led_corner_front_left = long_side;
-const int led_corner_back_right = short_side+long_side-1;
-const int led_corner_back_left = short_side+2*long_side;
-
-// TODO override - when ready set to false
-// TODO forceCallback() needs to light up the corners first and then each side of the chosen corner (work on this AFTER you find a proper way of lighting up a single LED)
-// TODO Check return value for all iirob::hardware functions (setAllRGBf(), setRangeRGBf() etc.)
-// TODO Add a duration parameter (number of steps per cycle should be determined from it) to Changeling (just add two modes)
-// TODO All the checks if start_led or end_led are negative or not can be avoided by simply using unsigned chars (as far as I can tell internally the LED library is actually using this type)
-// TODO Remove all ROS_INFO (wherever it makes sense) and replace it with ROS_DEBUG
-// TODO Add message that supports range + color parameters for lighting up one or more LEDs
-// NOTE Except for color values (ColorRGBA requires float) use double (float64 in ROS) for more accuracy
-
 /**
  * @brief The IIROB_LED_Rectangle class controls the LED strip mounted around the edges of the bottom platform of the SR2
  */
-
-class IIROB_LED_Rectangle
+class IIROB_LED_Rectangle : public IIROB_LED_Base
 {
 private:
-    const int MAX_FORCE;        ///< defines the maximum number of LEDs that can be lit (currently set to 10). If changed don't forget to redefine the corners to fit the new bounds
-    int m_msec;                 ///<
-    int m_numLeds;              ///< Number of LEDs the strip has
-    iirob_hardware::LEDStrip* m_led;    ///< Used for accessing the underlying hardware
-    int m_showDir;              ///<
-    bool status;                ///< Contains the return result from init()
-    std::string port;           ///< Serial port
-    int num;                    ///< Number of LEDs
+    static const int long_side = 108;
+    static const int short_side = 84;
 
+    static const int led_start = 0;
+    static const int led_end = 2*long_side + 2*short_side;
+
+    // Note: The indexing starts from 0 and ends at 383 for the rectangle. However we need not substract -1 for all corners due to the alignment of the strips
+    static const int led_corner_front_right = led_end-1;
+    static const int led_corner_front_left = long_side;
+    static const int led_corner_back_right = short_side+long_side-1;
+    static const int led_corner_back_left = short_side+2*long_side;
     ros::Subscriber subForce;           ///< Gives visual feedback for the magnitude and direction of an applied force (represented as a 3D vector)
-    ros::Subscriber subTurnLedsOnOff;   ///< Allows setting given range of (or a single) LEDs to a specific color with (0,0,0) being equal to "turn off"
-    // Action servers
-    actionlib::SimpleActionServer<iirob_led::BlinkyAction> blinkyAS;    ///< Handles Blinky goal messages
-    actionlib::SimpleActionServer<iirob_led::PoliceAction> policeAS;    ///< Handles Police goal messages
-    actionlib::SimpleActionServer<iirob_led::FourRegionsAction> fourRegionsAS;  ///< Handles FourRegions goal messages
-    actionlib::SimpleActionServer<iirob_led::ChaserLightAction> chaserLightAS;  ///< Handles ChaserLight goal messages
-
-    /**
-     * @brief checkLimits checks if the given start and end of a range of LEDs is withing some hardcoded limits and changes those accordingly
-     * @param start_led The beginning of a range of LEDs
-     * @param end_led The end of a range of LEDs
-     */
-    void checkLimits(int *start_led, int *end_led);
-
-    /**
-     * @brief init Initializes the hardware and starts the action servers
-     * @param port Port as string
-     * @param num Number of LEDs
-     * @return
-     */
-    bool init(std::string const& port, int const& m_numLeds);
 public:
     /**
      * @brief IIROB_LED_Rectangle Constructor that initializes the hardware
@@ -195,53 +165,12 @@ public:
      */
     ~IIROB_LED_Rectangle();
 
-    /**
-     * @brief spin Simply calls ros::spin()
-     */
-    void spin();
-
-    /**
-     * @brief getStatus Retrieves the status of the initialization procedure called inside the constructor
-     * @return True if init() was successful
-     */
-    bool getStatus();
-
     // Callbacks for all action servers and subscribers
     /**
      * @brief forceCallback Retrieves a vector with a TF2 frame and lights up one of the corners of the platform based on the force and its direction represented by the vector
      * @param led_force_msg
      */
     void forceCallback(const iirob_led::DirectionWithForce::ConstPtr& led_force_msg);
-
-    /**
-     * @brief turnLedOnOffCallback Turns on or off a given range of (or a single) LEDs
-     * @param led_onoff_msg
-     */
-    void turnLedOnOffCallback(const iirob_led::TurnLedsOnOff::ConstPtr& led_onoff_msg);
-
-    /**
-     * @brief blinkyCallback processes BlinkyActionGoal messages - it turns on and off a give stripe of LEDs; previous name: lightActionCallback_2 with argument std_msgs::Float32MultiArray::ConstPtr&
-     * @param goal
-     */
-    void blinkyCallback(const iirob_led::BlinkyGoal::ConstPtr& goal);
-
-    /**
-     * @brief policeCallback processes PoliceActionGoal messages - it turns on and off a give stripe of LEDs mimicing a police light; previous name: lightActionCallback_3 with argument std_msgs::Float32MultiArray::ConstPtr&
-     * @param goal
-     */
-    void policeCallback(const iirob_led::PoliceGoal::ConstPtr& goal);
-
-    /**
-     * @brief fourMusketeersCallback processes FourMusketeersGoal messages - it turns on and off a give stripe of LEDs which is split into 4 separate simultaniously blinking sections with different colors; previous name: lightActionCallback_4 with argument std_msgs::Float32MultiArray::ConstPtr&
-     * @param goal
-     */
-    void fourRegionsCallback(const iirob_led::FourRegionsGoal::ConstPtr& goal);
-
-    /**
-     * @brief chaserLightCallback processes ChaserLightGoal messages - a given stripe of LEDs traverses the whole strip in circle N times; previous name (maybe? never managed to make it work...): lightActionCallback_6 with argument std_msgs::Float32MultiArray::ConstPtr&
-     * @param goal
-     */
-    void chaserLightCallback(const iirob_led::ChaserLightGoal::ConstPtr& goal);
 };
 
-#endif // IIROB_LED_STRIP_H
+#endif // IIROB_LED_RECTANGLE_H
