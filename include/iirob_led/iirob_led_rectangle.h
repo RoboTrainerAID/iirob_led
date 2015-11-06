@@ -1,6 +1,7 @@
 #ifndef IIROB_LED_RECTANGLE_H
 #define IIROB_LED_RECTANGLE_H
 #include <iirob_led/DirectionWithForce.h>
+#include <iirob_led/PoliceAction.h>
 
 #include <geometry_msgs/Vector3.h>
 #include <tf2_ros/buffer.h>
@@ -10,26 +11,7 @@
 #include "iirob_led_base.h"
 
 /*
- * NOTES:
- * =========================================================================================
- * SR2 platform corners and quadrants:
- *   (3rd quadrant)         (2nd quadrant)
- * CORNER_BACK_LEFT ----- CORNER_FRONT_LEFT
- *         |                       |
- *         |           x           |_____________[key switch]
- *         |    (none quadrant)    |
- *         |                       |
- * CORNER_BACK_RIGHT ---- CORNER_FRONT_RIGHT
- *   (4th quadrant)         (1st quadrant)
- * QUADRANT_NONE      x = y = 0
- * QUADRANT_FIRST     1st quadrant: +x, +y
- * QUADRANT_SECOND    2nd quadrant: -x, +y
- * QUADRANT_THIRD     3rd quadrant: -x, -y
- * QUADRANT_FOURTH    4th quadrant: +x, -y
- *
- *
- *
- *
+
 tf2_ros::Buffer *p_tfBuffer;
     tf2_ros::TransformListener* p_tfListener;
     tf2::Transform transform_ee_base;
@@ -38,8 +20,7 @@ tf2_ros::Buffer *p_tfBuffer;
 
 p_tfBuffer = new tf2_ros::Buffer();
     p_tfListener = new tf2_ros::TransformListener(*p_tfBuffer, true);
- *
- *
+
 void ForceTorqueNode::updateFTData(const ros::TimerEvent& event)
 {
 //     ros::Time start = ros::Time::now();
@@ -88,21 +69,7 @@ void ForceTorqueNode::updateFTData(const ros::TimerEvent& event)
 //     ROS_INFO("Time between calls: %f", (event.current_real - event.last_real).toSec());
 //     ROS_INFO("Error: %f", (event.current_expected - event.current_real).toSec());
 }
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
+
  */
 
 /*
@@ -112,26 +79,67 @@ void ForceTorqueNode::updateFTData(const ros::TimerEvent& event)
  *
  * SR2 rectangle devided into quadrants:
  *
- *   (3rd quadrant)         (2nd quadrant)
- * CORNER_BACK_LEFT ----- CORNER_FRONT_LEFT
+ *
+ *
+ *                  LEFT
+ *                X=0,Y=+1
+ *                    |
+ *   (3rd quadrant)   |     (2nd quadrant)
+ * CORNER_BACK_LEFT --|-- CORNER_FRONT_LEFT
  *         |                       |
- *         |           x           |_____________[key switch]
- *         |    (none quadrant)    |
+ *    X=-1,Y=0           x      X=+1,Y=0___________[key switch]
+ *      BACK    (none quadrant)  FRONT
  *         |                       |
- * CORNER_BACK_RIGHT ---- CORNER_FRONT_RIGHT
- *   (4th quadrant)         (1st quadrant)
+ * CORNER_BACK_RIGHT--|-- CORNER_FRONT_RIGHT
+ *   (4th quadrant)   |     (1st quadrant)
+ *                    |
+ *                X=0,Y=-1
+ *                 RIGHT
+ *
  * QUADRANT_NONE      x = y = 0
+ * FRONT              +x, y = 0
+ * BACK               -x, y = 0
+ * LEFT               x = 0, +y
+ * RIGHT              x = 0, -y
  * QUADRANT_FIRST     1st quadrant: +x, +y
  * QUADRANT_SECOND    2nd quadrant: -x, +y
  * QUADRANT_THIRD     3rd quadrant: -x, -y
  * QUADRANT_FOURTH    4th quadrant: +x, -y
  */
 
-#define QUADRANT_NONE   0   // x = y = 0
-#define QUADRANT_FIRST  1   // 1st quadrant: +x, +y
-#define QUADRANT_SECOND 2   // 2nd quadrant: -x, +y
-#define QUADRANT_THIRD  3   // 3rd quadrant: -x, -y
-#define QUADRANT_FOURTH 4   // 4th quadrant: +x, -y
+#define QUADRANT_NONE               0
+#define FRONT                       1
+#define BACK                        2
+#define LEFT                        3
+#define RIGHT                       4
+#define QUADRANT_FIRST              5
+#define QUADRANT_SECOND             6
+#define QUADRANT_THIRD              7
+#define QUADRANT_FOURTH             8
+
+// Rectangle strip length of each side
+#define RECT_LONG_SIDE              108
+#define RECT_SHORT_SIDE             84
+
+// Rectangle strip length
+#define RECT_START                  0
+#define RECT_END                    ((2 * RECT_LONG_SIDE) + (2 * RECT_SHORT_SIDE))
+
+// Rectangle corners
+/*#define RECT_CORNER_FRONT_RIGHT     (RECT_LONG_SIDE)
+#define RECT_CORNER_FRONT_LEFT      (RECT_END - 1)
+#define RECT_CORNER_BACK_RIGHT      (RECT_SHORT_SIDE + (RECT_LONG_SIDE - 1))
+#define RECT_CORNER_BACK_LEFT       (RECT_SHORT_SIDE + (2 * RECT_LONG_SIDE))*/
+#define RECT_CORNER_FRONT_RIGHT     (RECT_END - 1)
+#define RECT_CORNER_FRONT_LEFT      (RECT_SHORT_SIDE + (2 * RECT_LONG_SIDE))
+#define RECT_CORNER_BACK_RIGHT      (RECT_SHORT_SIDE + (RECT_LONG_SIDE - 1))
+#define RECT_CORNER_BACK_LEFT       (RECT_LONG_SIDE)
+
+// Rectangle axes
+#define RECT_FRONT                  (RECT_SHORT_SIDE + (2 * RECT_LONG_SIDE) + (int)(RECT_SHORT_SIDE / 2))
+#define RECT_BACK                   (RECT_LONG_SIDE + (int)(RECT_SHORT_SIDE / 2))
+#define RECT_LEFT                   (RECT_SHORT_SIDE + (RECT_LONG_SIDE - 1) + (int)(RECT_LONG_SIDE / 2))
+#define RECT_RIGHT                  ((int)(RECT_LONG_SIDE/2))
 
 /**
  * @brief The IIROB_LED_Rectangle class controls the LED strip mounted around the edges of the bottom platform of the SR2
@@ -139,17 +147,6 @@ void ForceTorqueNode::updateFTData(const ros::TimerEvent& event)
 class IIROB_LED_Rectangle : public IIROB_LED_Base
 {
 private:
-    static const int long_side = 108;
-    static const int short_side = 84;
-
-    static const int led_start = 0;
-    static const int led_end = 2*long_side + 2*short_side;
-
-    // Note: The indexing starts from 0 and ends at 383 for the rectangle. However we need not substract -1 for all corners due to the alignment of the strips
-    static const int led_corner_front_right = led_end-1;
-    static const int led_corner_front_left = long_side;
-    static const int led_corner_back_right = short_side+long_side-1;
-    static const int led_corner_back_left = short_side+2*long_side;
     ros::Subscriber subForce;           ///< Gives visual feedback for the magnitude and direction of an applied force (represented as a 3D vector)
 public:
     /**
@@ -171,6 +168,8 @@ public:
      * @param led_force_msg
      */
     void forceCallback(const iirob_led::DirectionWithForce::ConstPtr& led_force_msg);
+
+    void policeCallback(const iirob_led::PoliceGoal::ConstPtr& goal);
 };
 
 #endif // IIROB_LED_RECTANGLE_H

@@ -53,10 +53,10 @@ private:
 
     // Note: The indexing starts from 0 and ends at 383 for the rectangle. However we need not substract -1 for all corners due to the alignment of the strips
     const int led_right;                    // 6
-    const int led_left;                       // 7
+    const int led_left;                     // 7
     const int led_forward_top;              // 14
-    const int led_center;     // 22
-    const int led_backward_bottom; // 31
+    const int led_center;                   // 22
+    const int led_backward_bottom;          // 31
 
     // Note: The indexing starts from 0 and ends at 31 for the cross.
     ros::Subscriber subForce;           ///< Gives visual feedback for the magnitude and direction of an applied force (represented as a 3D vector)
