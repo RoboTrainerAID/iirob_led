@@ -2,14 +2,12 @@
 #include "../SERIAL/SerialPortFactory.h"
 
 #include <cstdio>
-#include <iostream>
 #include <cmath>
 
 #define THREEWIRE
 
 using namespace iirob_hardware;
 
-// TODO See what led_lut is for.
 const unsigned char LEDStrip::led_lut[256] = {
 		0,   0,   0,   0,   0,   0,   0,   0,
 		0,   0,   0,   0,   0,   0,   0,   0,
@@ -46,7 +44,7 @@ const unsigned char LEDStrip::led_lut[256] = {
 };
 
 unsigned int LEDStrip::ledLog16(unsigned char col) {
-	return 65535*pow(col/255.0f, 2.5f);
+    return 65535*pow(col/255.0f, 2.5f); // Did you know that 2.5 is a standard gamma value? This might save your life one day
 }
 
 float LEDStrip::ledLogf(float col) {
@@ -258,6 +256,8 @@ std::vector<float> LEDStrip::hueToRGB(float hue) {
 }
 
 /////////////////////////////////////// NEW FEATURES ////////////////////////////////////////
+
+// TODO Outsource the send() and receive() calls in a separate method; setXRange() etc. would fill a buffer and only upon calling the setXRangeRGBSend() the buffer will be sent to the microcontroller
 // Methods for modifying individual parts of the strip
 bool LEDStrip::setXRangeRGB(unsigned char* rgb, int numLeds, int start_led, int end_led, bool log, bool checkLimits) {
     // We make this an optional step to avoid jumping to checkRange() when not required/wanted
@@ -273,7 +273,6 @@ bool LEDStrip::setXRangeRGB(unsigned char* rgb, int numLeds, int start_led, int 
 
     for (int i = (start_led*3)+3; i <= (end_led*3)+3+2; i++) // Additional +3 and <= instead of <
         buf[i] = log ? led_lut[*rgb++] : *rgb++;
-
 
     // TODO See how to directly access the array without any loops (best way to do things whenever we need to access a single LED)
 //    buf[(index*3)+1] = led_lut[*rgb];
@@ -308,41 +307,17 @@ bool LEDStrip::setRangeRGB(unsigned char red, unsigned char green, unsigned char
 #endif
     }
 
-    // Case when the starting LED and the ending one are the same - due to the way the loop inside setXRangeRGB() works, we need at least a difference of 1 between both so that it can actually be
-    // executed hence we add +1 to the end_led here for lighing up a single LED at position start_led
-    // FIXME Investigate the case when start = end (light up a single LED)
-    /*if(start_led == end_led) {
-        std::cout << "*********************** START == END" << std::endl;
-        if(end_led >= numLeds) {
-            std::cout << "*********************** END = " << end_led << " >= " << numLeds << std::endl;
-            start_led = numLeds;
-            end_led = 0;
-        }
-        else {
-            std::cout << "*********************** END = " << end_led << " < " << numLeds << " | Increasing end_led to " << end_led+1 << std::endl;
-            end_led++;
-        }
-
-        return setXRangeRGB(rgbtemp, numLeds, start_led, start_led, log);
-    }*/
-
     if(start_led > end_led) {
-        // TODO Splitting into two calls leads to noticable delays. Try to merge both ranges into a single one and send it via single call.
-        std::cout << "START > END" << std::endl;
+        // FIXME Splitting into two calls leads to noticable delays. Try to merge both ranges into a single one and send it via single call.
         // Case when the starting LED comes after the ending one - this happens when a transition [last LED index -> first LED index] occurs
         // In this situation we split the range into two parts - one is from start_led to last LED and the other one - from first LED to end_led
-        std::cout << "FIRST RANGE: from " << start_led << " to " << numLeds << std::endl;
         bool firstRange = setXRangeRGB(rgbtemp, numLeds, start_led, numLeds, log);
-        // FIXME Investigate the case when end = 0 and we split into two calls of setXRangeRGB()
-        //if(end_led == 0) end_led++; // Cover the case where we have end_led = 0 - other wise we get setXRangeRGB() from 0 to 0, which leads to error
-        std::cout << "SECOND RANGE: from " << 0 << " to " << end_led << std::endl;
         bool secondRange = setXRangeRGB(rgbtemp, numLeds, 0, end_led, log);
 
         return firstRange && secondRange;
     }
     else if(start_led < end_led) {
         // Case when starting LED comes before the ending one - normal case; nothing special to do here
-        std::cout << "START < END" << std::endl;
         return setXRangeRGB(rgbtemp, numLeds, start_led, end_led, log);
     }
 

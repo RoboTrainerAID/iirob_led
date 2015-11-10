@@ -107,6 +107,26 @@ void ForceTorqueNode::updateFTData(const ros::TimerEvent& event)
  * QUADRANT_FOURTH    4th quadrant: +x, -y
  */
 
+// Rectangle strip length of each side
+#define RECT_LONG_SIDE              108
+#define RECT_SHORT_SIDE             84
+
+// Rectangle strip length
+#define RECT_START                  0
+#define RECT_END                    ((2 * RECT_LONG_SIDE) + (2 * RECT_SHORT_SIDE))
+
+// Rectangle corners
+#define RECT_CORNER_FRONT_RIGHT     (RECT_LONG_SIDE + RECT_SHORT_SIDE + RECT_LONG_SIDE)
+#define RECT_CORNER_FRONT_LEFT      (RECT_END - 1)
+#define RECT_CORNER_BACK_RIGHT      ((RECT_LONG_SIDE - 1) + RECT_SHORT_SIDE)
+#define RECT_CORNER_BACK_LEFT       (RECT_LONG_SIDE)
+
+// Rectangle sides (one of two axes == 0)
+#define RECT_FRONT                  (RECT_LONG_SIDE + RECT_SHORT_SIDE + RECT_LONG_SIDE + (int)(RECT_SHORT_SIDE / 2))
+#define RECT_BACK                   (RECT_LONG_SIDE + (int)(RECT_SHORT_SIDE / 2))
+#define RECT_LEFT                   ((int)(RECT_LONG_SIDE / 2))
+#define RECT_RIGHT                  ((RECT_LONG_SIDE - 1) + RECT_SHORT_SIDE + (int)(RECT_LONG_SIDE / 2))
+
 #define QUADRANT_NONE               0
 #define FRONT                       1
 #define BACK                        2
@@ -117,29 +137,9 @@ void ForceTorqueNode::updateFTData(const ros::TimerEvent& event)
 #define QUADRANT_THIRD              7
 #define QUADRANT_FOURTH             8
 
-// Rectangle strip length of each side
-#define RECT_LONG_SIDE              108
-#define RECT_SHORT_SIDE             84
-
-// Rectangle strip length
-#define RECT_START                  0
-#define RECT_END                    ((2 * RECT_LONG_SIDE) + (2 * RECT_SHORT_SIDE))
-
-// Rectangle corners
-/*#define RECT_CORNER_FRONT_RIGHT     (RECT_LONG_SIDE)
-#define RECT_CORNER_FRONT_LEFT      (RECT_END - 1)
-#define RECT_CORNER_BACK_RIGHT      (RECT_SHORT_SIDE + (RECT_LONG_SIDE - 1))
-#define RECT_CORNER_BACK_LEFT       (RECT_SHORT_SIDE + (2 * RECT_LONG_SIDE))*/
-#define RECT_CORNER_FRONT_RIGHT     (RECT_END - 1)
-#define RECT_CORNER_FRONT_LEFT      (RECT_SHORT_SIDE + (2 * RECT_LONG_SIDE))
-#define RECT_CORNER_BACK_RIGHT      (RECT_SHORT_SIDE + (RECT_LONG_SIDE - 1))
-#define RECT_CORNER_BACK_LEFT       (RECT_LONG_SIDE)
-
-// Rectangle axes
-#define RECT_FRONT                  (RECT_SHORT_SIDE + (2 * RECT_LONG_SIDE) + (int)(RECT_SHORT_SIDE / 2))
-#define RECT_BACK                   (RECT_LONG_SIDE + (int)(RECT_SHORT_SIDE / 2))
-#define RECT_LEFT                   (RECT_SHORT_SIDE + (RECT_LONG_SIDE - 1) + (int)(RECT_LONG_SIDE / 2))
-#define RECT_RIGHT                  ((int)(RECT_LONG_SIDE/2))
+//#define LEDS_PER_QUADRANT           ((RECT_LONG_SIDE / 2) + (RECT_SHORT_SIDE / 2))  ///< The number of LEDs per quadrant
+//#define LEDS_PER_DEGREE_LED_LT_90  (90 / LEDS_PER_QUADRANT)                         ///< The step (represented by number of LEDs) when adding/subtracting 1 degree (Case: number of LEDs per quadrant < 90)
+//#define LEDS_PER_DEGREE_LED_GT_90  (LEDS_PER_QUADRANT / 90)                         ///< The step (represented by number of LEDs) when adding/subtracting 1 degree (Case: number of LEDs per quadrant > 90)
 
 /**
  * @brief The IIROB_LED_Rectangle class controls the LED strip mounted around the edges of the bottom platform of the SR2
@@ -169,6 +169,10 @@ public:
      */
     void forceCallback(const iirob_led::DirectionWithForce::ConstPtr& led_force_msg);
 
+    /**
+     * @brief policeCallback processes PoliceActionGoal messages - it turns on and off a give stripe of LEDs mimicing a police light
+     * @param goal
+     */
     void policeCallback(const iirob_led::PoliceGoal::ConstPtr& goal);
 };
 

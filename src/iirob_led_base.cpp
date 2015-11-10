@@ -2,7 +2,7 @@
 #include "RGBConverter.h"
 #include "iirob_led_base.h"
 
-const int IIROB_LED_Base::MAX_FORCE = 10;
+const int IIROB_LED_Base::MAX_FORCE = 100;
 
 IIROB_LED_Base::IIROB_LED_Base(ros::NodeHandle nodeHandle, std::string const& _port, int const& _m_numLeds)
     : m_led(0), m_msec(1),
@@ -123,19 +123,15 @@ void IIROB_LED_Base::blinkyCallback(const iirob_led::BlinkyGoal::ConstPtr& goal)
         if(num_leds <= m_numLeds) {
             // Use the num_leds as offset from start_led to calculate the new end_led
             end_led = (start_led + num_leds) % m_numLeds;
-            //end_led = (start_led-1 + num_leds) % m_numLeds;   // FIXME num_leds seems to be broken
-            //end_led = (start_led + num_leds); // OLD
             ROS_WARN("num_leds contains a non-zero value and will override end_led");
         }
         else
             ROS_WARN("num_leds contains a non-zero value, which however exceeds the total number of available LEDs in the strip. Falling back to end_led.");
     }
 
-    //if(start_led < 0) start_led = 0;
-    //if(end_led > m_numLeds) end_led = m_numLeds;
     checkLimits(&start_led, &end_led);
 
-    ROS_INFO("start_led: %d | end_led: %d", start_led, end_led);
+    ROS_DEBUG("start_led: %d | end_led: %d", start_led, end_led);
     ROS_DEBUG("%s starting Blinky action with color [%f %f %f] [RGB]. Duration(ON): %f sec, Duration(OFF): %f, start led: %d, end led: %d",
              ros::this_node::getName().c_str(),
              goal->color.r, goal->color.g, goal->color.b, goal->duration_on, goal->duration_off, start_led, end_led);
@@ -146,8 +142,8 @@ void IIROB_LED_Base::blinkyCallback(const iirob_led::BlinkyGoal::ConstPtr& goal)
     float h, s, v, v_old;
     // Initial conversion
     RGBConverter::rgbToHsv(r, g, b, &h, &s, &v);
-    ROS_INFO("Target full color (RGB): %.2f %.2f %.2f", r, g, b);
-    ROS_INFO("Target full color (HSV): %.2f %.2f %.2f", h, s, v);
+    ROS_DEBUG("Target full color (RGB): %.2f %.2f %.2f", r, g, b);
+    ROS_DEBUG("Target full color (HSV): %.2f %.2f %.2f", h, s, v);
     v_old = v;
 
     // If fade_in/fade_out is enable we assign a fixed portion of duration_on to it
@@ -155,47 +151,42 @@ void IIROB_LED_Base::blinkyCallback(const iirob_led::BlinkyGoal::ConstPtr& goal)
     if(fade_in) fade_in_duration = goal->duration_on/4;
     if(fade_out) fade_out_duration = goal->duration_on/4;
     double new_duration = goal->duration_on - (fade_in_duration + fade_out_duration);   // the duration when the LEDs will be light up at their full capacity is recalculated based on whether fade_in and/or fade_out has been turned on
-    ROS_INFO("duration_on (%f) will be split into {fade_in: %f | fade_out: %f | full: %f}", goal->duration_on, fade_in_duration, fade_out_duration, new_duration);
-
-    // Calculate the speed which the strip will be moving at
-    /*double single_step = 0.01;
-    double single_step_duration = (goal->duration_on/4)*single_step;
-    int steps_per_fade_cycle = (goal->duration_on/4)/single_step_duration;*/
+    ROS_DEBUG("duration_on (%f) will be split into {fade_in: %f | fade_out: %f | full: %f}", goal->duration_on, fade_in_duration, fade_out_duration, new_duration);
 
     // It is advisable to use a single step of 0.01 for the V (in HSV) for low durations. For longer consider also adding a connection to the duration so that the granularity can be increased resulting in some eye candy
     const int steps_per_fade_cycle = 100; // hardcoded number of steps per fade cycle; using this we can derive the value of a single step
     double single_step = v / steps_per_fade_cycle;  // this determines the HSV value increment/decrement and is based on the steps per fade cycle
     const double single_step_duration = (goal->duration_on/4) / steps_per_fade_cycle; // the duration of a single step is derived from the duration of the fade cycle devided by the steps per cycle
-    ROS_INFO("Single HSV step: %.5f | Single HSV step duration: %.10f | Steps per fade cycle: %d", single_step, single_step_duration, steps_per_fade_cycle);
+    ROS_DEBUG("Single HSV step: %.5f | Single HSV step duration: %.10f | Steps per fade cycle: %d", single_step, single_step_duration, steps_per_fade_cycle);
 
     for(int i = 0; i < goal->blinks; ++i, --blinks_left)
     {
         v = 0.0;    // Reset value (HSV) since this is the component that we will be working with
         // Fade in phase (if enabled)
         if(fade_in) {
-            ROS_INFO("Fade in");
+            ROS_DEBUG("Fade in");
             for(int current_step = 0; current_step < steps_per_fade_cycle; v += single_step, ++current_step) {
                 RGBConverter::hsvToRgb(h, s, v, &r, &g, &b);
                 m_led->setRangeRGBf(r, g, b, m_numLeds, start_led, end_led);
                 ros::Duration(single_step_duration).sleep();
-                ROS_INFO("[%d] HSV: %.2f %.2f %.2f", current_step, h, s, v);
+                ROS_DEBUG("[%d] HSV: %.2f %.2f %.2f", current_step, h, s, v);
             }
         }
 
         // Full light phase
-        ROS_INFO("Full");
+        ROS_DEBUG("Full");
         m_led->setRangeRGBf(goal->color.r, goal->color.g, goal->color.b, m_numLeds, start_led, end_led);
         ros::Duration(new_duration).sleep();
 
         v = v_old;
         // Fade out phase (if enabled)
         if(fade_out) {
-            ROS_INFO("Fade out");
+            ROS_DEBUG("Fade out");
             for(int current_step = steps_per_fade_cycle-1; current_step >= 0; v -= single_step, --current_step) {
                 RGBConverter::hsvToRgb(h, s, v, &r, &g, &b);
                 m_led->setRangeRGBf(r, g, b, m_numLeds, start_led, end_led);
                 ros::Duration(single_step_duration).sleep();
-                ROS_INFO("[%d] HSV: %.2f %.2f %.2f", current_step, h, s, v);
+                ROS_DEBUG("[%d] HSV: %.2f %.2f %.2f", current_step, h, s, v);
             }
         }
 
@@ -204,14 +195,12 @@ void IIROB_LED_Base::blinkyCallback(const iirob_led::BlinkyGoal::ConstPtr& goal)
         ros::Duration(goal->duration_off).sleep();
 
         feedback.blinks_left = blinks_left;
-        ROS_INFO("%s: Blinky will blink %d more times", ros::this_node::getName().c_str(), feedback.blinks_left);
         blinkyAS.publishFeedback(feedback);
     }
 
     feedback.blinks_left = blinks_left;
-    ROS_INFO("%s: Blinky will blink %d more times", ros::this_node::getName().c_str(), feedback.blinks_left);
 
-    //m_led->setAllRGBf(0, 0, 0, m_numLeds);
+    m_led->setAllRGBf(0, 0, 0, m_numLeds);
     result.blinks_left = blinks_left;
     blinkyAS.setSucceeded(result);
 }
@@ -230,7 +219,6 @@ void IIROB_LED_Base::policeCallback(const iirob_led::PoliceGoal::ConstPtr& goal)
     checkLimits(&start_led, &end_led);
 
     int totLength = (end_led - start_led);
-    ROS_INFO("SETUP COMPLETED");
 
     // Probably this here needs some rework
     // TODO Check how this works when the reversed (end_led > start_led) is passed onto this callback. For now force start_led < end_led
@@ -249,17 +237,17 @@ void IIROB_LED_Base::policeCallback(const iirob_led::PoliceGoal::ConstPtr& goal)
     int start_led_right_outer = end_led_right_inner;
     int end_led_right_outer = end_led;
 
-    ROS_INFO("start_led_left_outer: %d", start_led_left_outer);
-    ROS_INFO("end_led_left_outer: %d", end_led_left_outer);
+    ROS_DEBUG("start_led_left_outer: %d", start_led_left_outer);
+    ROS_DEBUG("end_led_left_outer: %d", end_led_left_outer);
 
-    ROS_INFO("start_led_left_inner: %d", start_led_left_inner);
-    ROS_INFO("end_led_left_inner: %d", end_led_left_inner);
+    ROS_DEBUG("start_led_left_inner: %d", start_led_left_inner);
+    ROS_DEBUG("end_led_left_inner: %d", end_led_left_inner);
 
-    ROS_INFO("start_led_right_inner: %d", start_led_right_inner);
-    ROS_INFO("end_led_right_inner: %d", end_led_right_inner);
+    ROS_DEBUG("start_led_right_inner: %d", start_led_right_inner);
+    ROS_DEBUG("end_led_right_inner: %d", end_led_right_inner);
 
-    ROS_INFO("start_led_right_outer: %d", start_led_right_outer);
-    ROS_INFO("end_led_right_outer: %d", end_led_right_outer);
+    ROS_DEBUG("start_led_right_outer: %d", start_led_right_outer);
+    ROS_DEBUG("end_led_right_outer: %d", end_led_right_outer);
 
 
     int j;
@@ -298,7 +286,7 @@ void IIROB_LED_Base::policeCallback(const iirob_led::PoliceGoal::ConstPtr& goal)
         fast_blinks_left = goal->fast_blinks;
     }
 
-    //m_led->setAllRGBf(0, 0, 0, m_numLeds);
+    m_led->setAllRGBf(0, 0, 0, m_numLeds);
     result.blinks_left = blinks_left;
     policeAS.setSucceeded(result);
 }
@@ -310,8 +298,6 @@ void IIROB_LED_Base::fourRegionsCallback(const iirob_led::FourRegionsGoal::Const
     int start_led = goal->start_led;
     int end_led = goal->end_led;
 
-    //if(start_led < 0) start_led = 0;
-    //if(end_led > m_numLeds) end_led = m_numLeds;
     checkLimits(&start_led, &end_led);
 
     if(abs(end_led - start_led) < 3) {
@@ -333,7 +319,7 @@ void IIROB_LED_Base::fourRegionsCallback(const iirob_led::FourRegionsGoal::Const
     int start_ledRegion4 = end_ledRegion3;
     int end_ledRegion4 = end_led;
 
-    ROS_INFO("%s starting Four Musketeers action with duration(ON): %.2f sec and duration(OFF): %.2f\n\n\t Region1\tstart led: %d, end led: %d\tcolor: %.2f %.2f %.2f \n\t Region2\tstart led: %d, end led: %d\tcolor: %.2f %.2f %.2f \n\t Region3\tstart led: %d, end led: %d\tcolor: %.2f %.2f %.2f \n\t Region4\tstart led: %d, end led: %d\tcolor: %.2f %.2f %.2f ",
+    ROS_DEBUG("%s starting FourRegions action with duration(ON): %.2f sec and duration(OFF): %.2f\n\n\t Region1\tstart led: %d, end led: %d\tcolor: %.2f %.2f %.2f \n\t Region2\tstart led: %d, end led: %d\tcolor: %.2f %.2f %.2f \n\t Region3\tstart led: %d, end led: %d\tcolor: %.2f %.2f %.2f \n\t Region4\tstart led: %d, end led: %d\tcolor: %.2f %.2f %.2f ",
              ros::this_node::getName().c_str(),
              goal->duration_on, goal->duration_off,
              start_ledRegion1, end_ledRegion1,
@@ -361,14 +347,12 @@ void IIROB_LED_Base::fourRegionsCallback(const iirob_led::FourRegionsGoal::Const
         ros::Duration(goal->duration_off).sleep();
 
         feedback.blinks_left = blinks_left;
-        ROS_INFO("%s: Four Musketeers will blink %d more times", ros::this_node::getName().c_str(), feedback.blinks_left);
         fourRegionsAS.publishFeedback(feedback);
     }
 
     feedback.blinks_left = blinks_left;
-    ROS_INFO("%s: Four Musketeers will blink %d more times", ros::this_node::getName().c_str(), feedback.blinks_left);
 
-    //m_led->setAllRGBf(0, 0, 0, m_numLeds);
+    m_led->setAllRGBf(0, 0, 0, m_numLeds);
     result.blinks_left = blinks_left;
     fourRegionsAS.setSucceeded(result);
 }
@@ -396,8 +380,6 @@ void IIROB_LED_Base::chaserLightCallback(const iirob_led::ChaserLightGoal::Const
     //int skip_per_step = m_numLeds / cycle_duration; // Speed based on the number of LEDs per cycle and how long it takes to traverse all
     int skip_per_step = goal->leds_per_step;
     if(skip_per_step <= 0 || skip_per_step >= 20) skip_per_step = 3;
-
-    //ROS_DEBUG("head: %d | offset: %d | time per step: %f", head, offset, single_step_duration);
 
     int old_tail;  // will use this to turn off the trail after the strip has moved
     for(int current_cycle = 0; current_cycle < cycles; current_cycle++) {
@@ -427,11 +409,9 @@ void IIROB_LED_Base::chaserLightCallback(const iirob_led::ChaserLightGoal::Const
             feedback.current_start_pos = head;
             chaserLightAS.publishFeedback(feedback);
         }
-        ROS_DEBUG("**********************Finished with cycle %d**********************", current_cycle+1);
     }
 
     m_led->setAllRGBf(0, 0, 0, m_numLeds);
-    //m_led->setRangeRGBf(0, 0, 0, m_numLeds, head, tail);
     feedback.current_start_pos = head;
     chaserLightAS.publishFeedback(feedback);
     result.current_start_pos = head;

@@ -12,7 +12,7 @@ namespace iirob_hardware {
 		static const unsigned char START = 0xAA;
 		static const unsigned char END  = 0xBB;
 		static const unsigned char OK  = 0xCC;
-		static const unsigned char led_lut[256];
+        static const unsigned char led_lut[256];    ///< Lookup table for the intensity
 
 		/** Create a connection to the specified serial port and open the device.
 		 *  Valid port strings are e.g. "COM7" or "/dev/ttyS7", "/dev/ttyUSB0". */

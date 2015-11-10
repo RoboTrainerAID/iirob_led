@@ -1,4 +1,5 @@
-#include <cmath>
+//#include <cmath>
+#include <math.h>
 #include "iirob_led_rectangle.h"
 #include "iirob_led_base.h"
 #include "RGBConverter.h"
@@ -37,10 +38,10 @@ void IIROB_LED_Rectangle::forceCallback(const iirob_led::DirectionWithForce::Con
     int location;
 
     // Cases where one of both axes equals zero
-    if(x == 1 && y == 0) coordinates = LEFT;
-    else if(x == -1 && y == 0) coordinates = RIGHT;
-    else if(x == 0 && y == 1) coordinates = FRONT;
-    else if(x == 0 && y == -1) coordinates = BACK;
+    if(x > 0  && y == 0) coordinates = LEFT;
+    else if(x < 0 && y == 0) coordinates = RIGHT;
+    else if(x == 0 && y > 0) coordinates = FRONT;
+    else if(x == 0 && y < 0) coordinates = BACK;
     // Cases where both axes are unequal zero
     else if(x > 0 && y > 0) coordinates = QUADRANT_FIRST;
     else if(x < 0 && y > 0) coordinates = QUADRANT_SECOND;
@@ -48,9 +49,18 @@ void IIROB_LED_Rectangle::forceCallback(const iirob_led::DirectionWithForce::Con
     else if(x > 0 && y < 0) coordinates = QUADRANT_FOURTH;
     else coordinates = QUADRANT_NONE;
 
-    ROS_INFO("XY coordinates: [%.3f , %.3f] (quadrant macro %d)\t|\tForce (upper limit of %d): %.3f", x, y, coordinates, MAX_FORCE, force);
+    ROS_INFO("XY coordinates: [%.3f , %.3f] (direction macro: %d)\t|\tForce (upper limit of %d): %.3f", x, y, coordinates, MAX_FORCE, force);
 
-    //
+    /*
+     * We combine the LED indexing (front right corner: LED[0] ... back right corner: LED[0+108] ... ... ... front right corner: LED[383])
+     * and the quadrants:
+     *
+     *
+     */
+    //int startingPointOnStrip = 0;
+    double ledPerDeg = 0;
+    double translationAlongStrip = 0;
+    double angle = 0.;  // Angle in radians
     switch(coordinates) {
     case QUADRANT_NONE:
         // If X and Y are equal to 0 we cannot determine the corner hence no point in displaying anything
@@ -67,107 +77,92 @@ void IIROB_LED_Rectangle::forceCallback(const iirob_led::DirectionWithForce::Con
     case RIGHT:
         location = RECT_RIGHT;
         break;
+
+        /*
+         * If the vector does not lie on one of the axes we need to determine the angle it has relative to the coordinate system that we have defined
+         *
+         *               FRONT
+         *   [0],[383]    +y        ______SR2
+         *         \  _____|_____  / __________unit circle
+         *          \/     |     \/ /
+         *          /|-----|-----|\/
+         *         / |     |     | \
+         *         | |     |     | |
+         *LEFT -x__|_|_____0_____|_|__+x RIGHT
+         *         | |     |     | |
+         *         | |     |     | |
+         *         \ |     |     | /
+         *          \|-----|-----|/
+         *           \_____|_____/
+         *                 |
+         *                -y
+         *               BACK
+         *
+         */
     case QUADRANT_FIRST:
-        location = RECT_CORNER_FRONT_LEFT;
-        ROS_INFO("Front left");
-        break;
-    case QUADRANT_SECOND:
+        angle = atan2(y, x)*180/M_PI;
+        ROS_INFO("Vector angle relative to defined coordinate system: %.3fdeg", angle);
         location = RECT_CORNER_FRONT_RIGHT;
         ROS_INFO("Front right");
         break;
+    case QUADRANT_SECOND:
+        //startingPointOnStrip = RECT_RIGHT+1;
+        //location = starting_point_on_strip+(int)x;
+        angle = atan2(y, x)*180/M_PI;
+        ROS_INFO("Vector angle relative to defined coordinate system: %.3fdeg", angle);
+        location = RECT_CORNER_FRONT_LEFT;
+        ROS_INFO("Front left");
+        break;
     case QUADRANT_THIRD:
+        angle = atan2(y, x)*180/M_PI;
+        ROS_INFO("Vector angle relative to defined coordinate system: %.3fdeg", angle);
         location = RECT_CORNER_BACK_LEFT;
         ROS_INFO("Back left");
         break;
     case QUADRANT_FOURTH:
+        angle = atan2(y, x)*180/M_PI;
+        ROS_INFO("Vector angle relative to defined coordinate system: %.3fdeg", angle);
         location = RECT_CORNER_BACK_RIGHT;
         ROS_INFO("Back right");
         break;
     }
 
+    angle = atan2(y,x); // Note that at this point we have already dismissed the undefined case where x == y == 0 (QUADRANT_NONE)
+    ledPerDeg = 360./m_numLeds; //(m_numLeds < 360) ? 360/m_numLeds : m_numLeds/360;
+    translationAlongStrip = (angle*180./M_PI)*ledPerDeg;
+    location = (int)round(RECT_RIGHT + translationAlongStrip) % m_numLeds;
+    ROS_INFO("Led/Angle: %f | Angle: %frad (=%fdeg) | Translation: %f | location: %d", ledPerDeg, angle, angle*180./M_PI, translationAlongStrip, location);
+
     m_led->setAllRGBf(0, 0, 0, m_numLeds);
-    int LED = 0;
 
-    switch (location) {
-    // X or Y == 0
-    case RECT_FRONT:
-        ROS_INFO("Front");
-        m_led->setRangeRGBf(0, 0, 1, m_numLeds, location-2, location+1);
-        break;
-    case RECT_BACK:
-        ROS_INFO("Back");
-        m_led->setRangeRGBf(0, 0, 1, m_numLeds, location-2, location+1);
-        break;
-    case RECT_LEFT:
-        ROS_INFO("Left");
-        m_led->setRangeRGBf(0, 0, 1, m_numLeds, location-2, location+1);
-        break;
-    case RECT_RIGHT:
-        ROS_INFO("Right");
-        m_led->setRangeRGBf(0, 0, 1, m_numLeds, location-2, location+1);
-        break;
-
-    // X and Y != 0 (quadrants)
-    case RECT_CORNER_FRONT_LEFT:
-        if(forceRounded == 1)
-        {
-            m_led->setRangeRGBf(1, 0, 0, m_numLeds, location, location);
-            break;
-        }
-
-        forceRounded--;
-
-        m_led->setRangeRGBf(1, 0, 0, m_numLeds, location-forceRounded, location+forceRounded);
-        break;
-    case RECT_CORNER_FRONT_RIGHT:
-        if(forceRounded == 1)
-        {
-            m_led->setRangeRGBf(1, 0, 0, m_numLeds, location, location);
-            break;
-        }
-
-        forceRounded--;
+    if(forceRounded == 1)
+    {
+        m_led->setRangeRGBf(0, 0, 1, m_numLeds, location, location);
+        return;
+    }
+    forceRounded--;
+    if(location == RECT_CORNER_FRONT_LEFT) {
         m_led->setRangeRGBf(1, 0, 0, m_numLeds, (m_numLeds-1)-forceRounded, m_numLeds-1);
         m_led->setRangeRGBf(1, 0, 0, m_numLeds, 0, forceRounded-1);
-        break;
-    case RECT_CORNER_BACK_LEFT:
-        if(forceRounded == 1)
-        {
-            m_led->setRangeRGBf(1, 0, 0, m_numLeds, location, location);
-            break;
-        }
-
-        forceRounded--;
-
-        m_led->setRangeRGBf(1, 0, 0, m_numLeds, location-forceRounded, location+forceRounded);
-        break;
-    case RECT_CORNER_BACK_RIGHT:
-        if(forceRounded == 1)
-        {
-            m_led->setRangeRGBf(1, 0, 0, m_numLeds, location, location);
-            break;
-        }
-
-        forceRounded--;
-
-        m_led->setRangeRGBf(1, 0, 0, m_numLeds, location-forceRounded, location+forceRounded);
-        break;
     }
+    else m_led->setRangeRGBf(1, 0, 0, m_numLeds, location-forceRounded, location+forceRounded);
+    m_led->setRangeRGBf(0, 0, 1, m_numLeds, location, location);
 
-    if(location == RECT_RIGHT || location == RECT_LEFT || location == RECT_FRONT || location == RECT_BACK) m_led->setRangeRGBf(0, 0, 1, m_numLeds, location-2, location+1);
-    else {
-        if(forceRounded == 1)
-        {
-            m_led->setRangeRGBf(1, 0, 0, m_numLeds, location, location);
-            break;
-        }
+    /*if(forceRounded == 1)
+    {
+        m_led->setRangeRGBf(1, 0, 0, m_numLeds, location, location);
+        return;
+    }
+    else
+    {
         forceRounded--;
-
-        if(location == RECT_CORNER_FRONT_RIGHT) {
+        if(location == RECT_CORNER_FRONT_LEFT) {
             m_led->setRangeRGBf(1, 0, 0, m_numLeds, (m_numLeds-1)-forceRounded, m_numLeds-1);
             m_led->setRangeRGBf(1, 0, 0, m_numLeds, 0, forceRounded-1);
         }
-    }
+        else m_led->setRangeRGBf(1, 0, 0, m_numLeds, location-forceRounded, location+forceRounded);
+        m_led->setRangeRGBf(0, 0, 1, m_numLeds, location, location);
+    }*/
 }
 
 void IIROB_LED_Rectangle::policeCallback(const iirob_led::PoliceGoal::ConstPtr& goal) {
