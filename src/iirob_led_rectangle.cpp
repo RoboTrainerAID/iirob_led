@@ -42,7 +42,7 @@ void IIROB_LED_Rectangle::forceCallback(const iirob_led::DirectionWithForce::Con
     int location;
 
     // Cases where one of both axes equals zero
-    if(x > 0  && y == 0) coordinates = LEFT;
+    /*if(x > 0  && y == 0) coordinates = LEFT;
     else if(x < 0 && y == 0) coordinates = RIGHT;
     else if(x == 0 && y > 0) coordinates = FRONT;
     else if(x == 0 && y < 0) coordinates = BACK;
@@ -51,7 +51,18 @@ void IIROB_LED_Rectangle::forceCallback(const iirob_led::DirectionWithForce::Con
     else if(x < 0 && y > 0) coordinates = QUADRANT_SECOND;
     else if(x < 0 && y < 0) coordinates = QUADRANT_THIRD;
     else if(x > 0 && y < 0) coordinates = QUADRANT_FOURTH;
-    else coordinates = QUADRANT_NONE;
+    else coordinates = QUADRANT_NONE;*/
+
+    if(x == 0  && y < 0) coordinates = RIGHT;
+    else if(x == 0 && y > 0) coordinates = LEFT;
+    else if(y == 0 && x > 0) coordinates = FRONT;
+    else if(y == 0 && x < 0) coordinates = BACK;
+    // Cases where both axes are unequal zero
+    /*else if(x > 0 && y < 0) coordinates = QUADRANT_FIRST;
+    else if(x > 0 && y > 0) coordinates = QUADRANT_SECOND;
+    else if(x < 0 && y > 0) coordinates = QUADRANT_THIRD;
+    else if(x < 0 && y < 0) coordinates = QUADRANT_FOURTH;
+    else coordinates = QUADRANT_NONE;*/
 
     ROS_INFO("XY coordinates: [%.3f , %.3f] (direction macro: %d)\t|\tForce (upper limit of %d): %.3f", x, y, coordinates, MAX_FORCE, force);
 
@@ -65,6 +76,29 @@ void IIROB_LED_Rectangle::forceCallback(const iirob_led::DirectionWithForce::Con
     double ledPerDeg = 0;
     double translationAlongStrip = 0;
     double angle = 0.;  // Angle in radians
+
+    /*
+     * If the vector does not lie on one of the axes we need to determine the angle it has relative to the coordinate system that we have defined
+     *
+     *               FRONT
+     *   [0],[383]    +y        ______SR2
+     *         \  _____|_____  / __________unit circle
+     *          \/     |     \/ /
+     *          /|-----|-----|\/
+     *         / |     |     | \
+     *         | |     |     | |
+     *LEFT -x__|_|_____0_____|_|__+x RIGHT
+     *         | |     |     | |
+     *         | |     |     | |
+     *         \ |     |     | /
+     *          \|-----|-----|/
+     *           \_____|_____/
+     *                 |
+     *                -y
+     *               BACK
+     *
+     */
+
     switch(coordinates) {
     case QUADRANT_NONE:
         // If X and Y are equal to 0 we cannot determine the corner hence no point in displaying anything
@@ -82,29 +116,8 @@ void IIROB_LED_Rectangle::forceCallback(const iirob_led::DirectionWithForce::Con
         location = RECT_RIGHT;
         break;
 
-        /*
-         * If the vector does not lie on one of the axes we need to determine the angle it has relative to the coordinate system that we have defined
-         *
-         *               FRONT
-         *   [0],[383]    +y        ______SR2
-         *         \  _____|_____  / __________unit circle
-         *          \/     |     \/ /
-         *          /|-----|-----|\/
-         *         / |     |     | \
-         *         | |     |     | |
-         *LEFT -x__|_|_____0_____|_|__+x RIGHT
-         *         | |     |     | |
-         *         | |     |     | |
-         *         \ |     |     | /
-         *          \|-----|-----|/
-         *           \_____|_____/
-         *                 |
-         *                -y
-         *               BACK
-         *
-         */
-
         // TODO Change coordinate system: new x+ is old y+ and new y+ is old x-
+
     case QUADRANT_FIRST:
         angle = atan2(y, x)*180/M_PI;
         ROS_INFO("Vector angle relative to defined coordinate system: %.3fdeg", angle);
@@ -134,8 +147,8 @@ void IIROB_LED_Rectangle::forceCallback(const iirob_led::DirectionWithForce::Con
     }
 
     angle = atan2(y,x); // Note that at this point we have already dismissed the undefined case where x == y == 0 (QUADRANT_NONE)
-    ledPerDeg = 360./m_numLeds; //(m_numLeds < 360) ? 360/m_numLeds : m_numLeds/360;
-    translationAlongStrip = (angle*180./M_PI)*ledPerDeg;
+    ledPerDeg = m_numLeds/360.;
+    translationAlongStrip = (angle*180./M_PI) * ledPerDeg;
     location = (int)round(RECT_RIGHT + translationAlongStrip) % m_numLeds;
     ROS_INFO("Led/Angle: %f | Angle: %frad (=%fdeg) | Translation: %f | location: %d", ledPerDeg, angle, angle*180./M_PI, translationAlongStrip, location);
 

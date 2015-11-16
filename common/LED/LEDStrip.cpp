@@ -267,9 +267,6 @@ bool LEDStrip::setXRangeRGB(unsigned char* rgb, int numLeds, int start_led, int 
     }
 
     bool ok = true;
-	buf[0] = LEDStrip::START;
-    buf[1] = (char)(numLeds>>8);
-    buf[2] = (char)numLeds;
 
     for (int i = (start_led*3)+3; i <= (end_led*3)+3+2; i++) // Additional +3 and <= instead of <
         buf[i] = log ? led_lut[*rgb++] : *rgb++;
@@ -281,7 +278,11 @@ bool LEDStrip::setXRangeRGB(unsigned char* rgb, int numLeds, int start_led, int 
 
     // Send only when the sendTrigger flag is set
     if(sendTrigger) {
+        buf[0] = LEDStrip::START;
+        buf[1] = (char)(numLeds>>8);
+        buf[2] = (char)numLeds;
         buf[numLeds*3+3] = LEDStrip::END;
+
         ok &= send(buf, numLeds*3+4);
         ok &= receive(buf, 1);
         ok &= (buf[0]==LEDStrip::OK);
@@ -311,7 +312,6 @@ bool LEDStrip::setRangeRGB(unsigned char red, unsigned char green, unsigned char
     }
 
     if(start_led > end_led) {
-        // FIXME Splitting into two calls leads to noticable delays. Try to merge both ranges into a single one and send it via single call.
         // Case when the starting LED comes after the ending one - this happens when a transition [last LED index -> first LED index] occurs
         // In this situation we split the range into two parts - one is from start_led to last LED and the other one - from first LED to end_led
         bool firstRange = setXRangeRGB(rgbtemp, numLeds, start_led, numLeds, log, checkLimits, false);
