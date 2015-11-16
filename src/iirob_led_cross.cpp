@@ -12,8 +12,11 @@ IIROB_LED_Cross::IIROB_LED_Cross(ros::NodeHandle nodeHandle, std::string const& 
       led_forward_top(horizontal_side*2),
       led_center(led_forward_top + vertical_side),
       led_backward_bottom(led_center + vertical_side),
+      policeAS(nodeHandle, "police", boost::bind(&IIROB_LED_Cross::policeCallback, this, _1), false),
       IIROB_LED_Base::IIROB_LED_Base(nodeHandle, _port, _m_numLeds)
 {
+    policeAS.start();
+    ROS_INFO("police action server started");
     ROS_INFO("led_force_cross subscriber started");
     subForce = nodeHandle.subscribe("led_force_cross", 10, &IIROB_LED_Cross::forceCallback, this);
 }
@@ -21,13 +24,14 @@ IIROB_LED_Cross::IIROB_LED_Cross(ros::NodeHandle nodeHandle, std::string const& 
 IIROB_LED_Cross::~IIROB_LED_Cross() {
     ROS_INFO("Turning all LEDs off");
     // Turn all LEDs off and delete the m_led
-    if (m_led) {
+    /*if (m_led) {
         m_led->setAllRGBf(0, 0, 0, m_numLeds);
         m_led->setUniRGB(0, 0, 0);
         delete m_led;
-    }
+    }*/
 
-    ROS_INFO("Shutting down all action servers and subscribers");
+    ROS_INFO("Shutting down police action server and led_force_rectangle subscriber");
+    policeAS.shutdown();
     subForce.shutdown();
 }
 
@@ -49,7 +53,6 @@ void IIROB_LED_Cross::policeCallback(const iirob_led::PoliceGoal::ConstPtr& goal
     checkLimits(&start_led, &end_led);
 
     int totLength = (end_led - start_led);
-    ROS_INFO("SETUP COMPLETED");
 
     // Probably this here needs some rework
     // TODO Check how this works when the reversed (end_led > start_led) is passed onto this callback. For now force start_led < end_led

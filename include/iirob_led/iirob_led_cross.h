@@ -59,6 +59,7 @@ private:
     const int led_backward_bottom;          // 31
 
     // Note: The indexing starts from 0 and ends at 31 for the cross.
+    actionlib::SimpleActionServer<iirob_led::PoliceAction> policeAS;  ///< Handles Police goal messages
     ros::Subscriber subForce;           ///< Gives visual feedback for the magnitude and direction of an applied force (represented as a 3D vector)
 public:
     /**

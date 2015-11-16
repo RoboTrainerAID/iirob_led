@@ -5,14 +5,18 @@
 #include "RGBConverter.h"
 
 IIROB_LED_Rectangle::IIROB_LED_Rectangle(ros::NodeHandle nodeHandle, std::string const& _port, int const& _m_numLeds)
-    : IIROB_LED_Base::IIROB_LED_Base(nodeHandle, _port, _m_numLeds)
+    : policeAS(nodeHandle, "police", boost::bind(&IIROB_LED_Rectangle::policeCallback, this, _1), false),
+      IIROB_LED_Base::IIROB_LED_Base(nodeHandle, _port, _m_numLeds)
 {
-    ROS_INFO("led_force_rectangle subscriber started");
+    policeAS.start();
+    ROS_INFO("police action server started");
     subForce = nodeHandle.subscribe("led_force_rectangle", 10, &IIROB_LED_Rectangle::forceCallback, this);
+    ROS_INFO("led_force_rectangle subscriber started");
 }
 
 IIROB_LED_Rectangle::~IIROB_LED_Rectangle() {
-    ROS_INFO("Shutting down led_force subscriber");
+    ROS_INFO("Shutting down police action server and led_force_rectangle subscriber");
+    policeAS.shutdown();
     subForce.shutdown();
 }
 
@@ -99,6 +103,8 @@ void IIROB_LED_Rectangle::forceCallback(const iirob_led::DirectionWithForce::Con
          *               BACK
          *
          */
+
+        // TODO Change coordinate system: new x+ is old y+ and new y+ is old x-
     case QUADRANT_FIRST:
         angle = atan2(y, x)*180/M_PI;
         ROS_INFO("Vector angle relative to defined coordinate system: %.3fdeg", angle);
@@ -140,6 +146,7 @@ void IIROB_LED_Rectangle::forceCallback(const iirob_led::DirectionWithForce::Con
         m_led->setRangeRGBf(0, 0, 1, m_numLeds, location, location);
         return;
     }
+
     forceRounded--;
     if(location == RECT_CORNER_FRONT_LEFT) {
         m_led->setRangeRGBf(1, 0, 0, m_numLeds, (m_numLeds-1)-forceRounded, m_numLeds-1);
@@ -147,22 +154,6 @@ void IIROB_LED_Rectangle::forceCallback(const iirob_led::DirectionWithForce::Con
     }
     else m_led->setRangeRGBf(1, 0, 0, m_numLeds, location-forceRounded, location+forceRounded);
     m_led->setRangeRGBf(0, 0, 1, m_numLeds, location, location);
-
-    /*if(forceRounded == 1)
-    {
-        m_led->setRangeRGBf(1, 0, 0, m_numLeds, location, location);
-        return;
-    }
-    else
-    {
-        forceRounded--;
-        if(location == RECT_CORNER_FRONT_LEFT) {
-            m_led->setRangeRGBf(1, 0, 0, m_numLeds, (m_numLeds-1)-forceRounded, m_numLeds-1);
-            m_led->setRangeRGBf(1, 0, 0, m_numLeds, 0, forceRounded-1);
-        }
-        else m_led->setRangeRGBf(1, 0, 0, m_numLeds, location-forceRounded, location+forceRounded);
-        m_led->setRangeRGBf(0, 0, 1, m_numLeds, location, location);
-    }*/
 }
 
 void IIROB_LED_Rectangle::policeCallback(const iirob_led::PoliceGoal::ConstPtr& goal) {
@@ -219,20 +210,20 @@ void IIROB_LED_Rectangle::policeCallback(const iirob_led::PoliceGoal::ConstPtr& 
         {
             ROS_INFO(" -- Short blinks left: %d", fast_blinks_left);
             // Blink the outer subsections
-            m_led->setRangeRGBf(goal->color_outer.r, goal->color_outer.g, goal->color_outer.b, m_numLeds, start_led_left_outer, end_led_left_outer);
+            m_led->setRangeRGBf(goal->color_outer.r, goal->color_outer.g, goal->color_outer.b, m_numLeds, start_led_left_outer, end_led_left_outer, true, true, false);
             m_led->setRangeRGBf(goal->color_outer.r, goal->color_outer.g, goal->color_outer.b, m_numLeds, start_led_right_outer, end_led_right_outer);
             ros::Duration(goal->fast_duration_on).sleep();
 
-            m_led->setRangeRGBf(0, 0, 0, m_numLeds, start_led_left_outer, end_led_left_outer);
+            m_led->setRangeRGBf(0, 0, 0, m_numLeds, start_led_left_outer, end_led_left_outer, true, true, false);
             m_led->setRangeRGBf(0, 0, 0, m_numLeds, start_led_right_outer, end_led_right_outer);
             ros::Duration(goal->fast_duration_off).sleep();
 
             // Blink the inner subsections
-            m_led->setRangeRGBf(goal->color_inner.r, goal->color_inner.g, goal->color_inner.b, m_numLeds, start_led_left_inner, end_led_left_inner);
+            m_led->setRangeRGBf(goal->color_inner.r, goal->color_inner.g, goal->color_inner.b, m_numLeds, start_led_left_inner, end_led_left_inner, true, true, false);
             m_led->setRangeRGBf(goal->color_inner.r, goal->color_inner.g, goal->color_inner.b, m_numLeds, start_led_right_inner, end_led_right_inner);
             ros::Duration(goal->fast_duration_on).sleep();
 
-            m_led->setRangeRGBf(0, 0, 0, m_numLeds, start_led_left_inner, end_led_left_inner);
+            m_led->setRangeRGBf(0, 0, 0, m_numLeds, start_led_left_inner, end_led_left_inner, true, true, false);
             m_led->setRangeRGBf(0, 0, 0, m_numLeds, start_led_right_inner, end_led_right_inner);
             ros::Duration(goal->fast_duration_off).sleep();
 

@@ -9,7 +9,6 @@ IIROB_LED_Base::IIROB_LED_Base(ros::NodeHandle nodeHandle, std::string const& _p
       port(_port), m_numLeds(_m_numLeds),
       // Initialize all action servers and bind them to the respective callbacks
       blinkyAS(nodeHandle, "blinky", boost::bind(&IIROB_LED_Base::blinkyCallback, this, _1), false),
-      policeAS(nodeHandle, "police", boost::bind(&IIROB_LED_Base::policeCallback, this, _1), false),
       fourRegionsAS(nodeHandle, "four_regions", boost::bind(&IIROB_LED_Base::fourRegionsCallback, this, _1), false),
       chaserLightAS(nodeHandle, "chaser_light", boost::bind(&IIROB_LED_Base::chaserLightCallback, this, _1), false)
 {
@@ -35,11 +34,9 @@ IIROB_LED_Base::~IIROB_LED_Base() {
         delete m_led;
     }
 
-    ROS_INFO("Shutting down turn_onoff subscriber");
-    subTurnLedsOnOff.shutdown();
     ROS_INFO("Shutting down action servers and subscribers");
+    subTurnLedsOnOff.shutdown();
     blinkyAS.shutdown();
-    policeAS.shutdown();
     fourRegionsAS.shutdown();
     chaserLightAS.shutdown();
 }
@@ -65,8 +62,6 @@ bool IIROB_LED_Base::init(std::string const& port, int const& m_numLeds) {
 
         blinkyAS.start();
         ROS_INFO("blinky action server started");
-        policeAS.start();
-        ROS_INFO("police action server started");
         fourRegionsAS.start();
         ROS_INFO("four_regions action server started");
         chaserLightAS.start();
@@ -205,92 +200,6 @@ void IIROB_LED_Base::blinkyCallback(const iirob_led::BlinkyGoal::ConstPtr& goal)
     blinkyAS.setSucceeded(result);
 }
 
-void IIROB_LED_Base::policeCallback(const iirob_led::PoliceGoal::ConstPtr& goal) {
-    iirob_led::PoliceFeedback feedback;
-    iirob_led::PoliceResult result;
-    int blinks_left = goal->blinks;
-    int fast_blinks_left = goal->fast_blinks;
-    int start_led = goal->start_led;
-    int end_led = goal->end_led;
-    int num_inner_leds = goal->num_inner_leds;
-
-    //if(start_led < 0) start_led = 0;
-    //if(end_led >= m_numLeds) end_led = m_numLeds;
-    checkLimits(&start_led, &end_led);
-
-    int totLength = (end_led - start_led);
-
-    // Probably this here needs some rework
-    // TODO Check how this works when the reversed (end_led > start_led) is passed onto this callback. For now force start_led < end_led
-    if(start_led > end_led) { int temp = start_led; start_led = end_led; end_led = temp; }
-
-    double half = totLength/2;
-    int start_led_left_outer = start_led;
-    int end_led_left_outer = start_led + ((int)half - num_inner_leds);
-
-    int start_led_left_inner = end_led_left_outer;
-    int end_led_left_inner = start_led + (int)half;
-
-    int start_led_right_inner = end_led_left_inner;
-    int end_led_right_inner = start_led_right_inner + num_inner_leds - 1;
-
-    int start_led_right_outer = end_led_right_inner;
-    int end_led_right_outer = end_led;
-
-    ROS_DEBUG("start_led_left_outer: %d", start_led_left_outer);
-    ROS_DEBUG("end_led_left_outer: %d", end_led_left_outer);
-
-    ROS_DEBUG("start_led_left_inner: %d", start_led_left_inner);
-    ROS_DEBUG("end_led_left_inner: %d", end_led_left_inner);
-
-    ROS_DEBUG("start_led_right_inner: %d", start_led_right_inner);
-    ROS_DEBUG("end_led_right_inner: %d", end_led_right_inner);
-
-    ROS_DEBUG("start_led_right_outer: %d", start_led_right_outer);
-    ROS_DEBUG("end_led_right_outer: %d", end_led_right_outer);
-
-
-    int j;
-    for(int i = 0; i < goal->blinks; ++i, --blinks_left)
-    {
-        ROS_INFO(" -- Long blinks left: %d", blinks_left);
-        for(j = 0; j < goal->fast_blinks; ++j, --fast_blinks_left)
-        {
-            ROS_INFO(" -- Short blinks left: %d", fast_blinks_left);
-            // Blink the outer subsections
-            m_led->setRangeRGBf(goal->color_outer.r, goal->color_outer.g, goal->color_outer.b, m_numLeds, start_led_left_outer, end_led_left_outer);
-            m_led->setRangeRGBf(goal->color_outer.r, goal->color_outer.g, goal->color_outer.b, m_numLeds, start_led_right_outer, end_led_right_outer);
-            ros::Duration(goal->fast_duration_on).sleep();
-
-            m_led->setRangeRGBf(0, 0, 0, m_numLeds, start_led_left_outer, end_led_left_outer);
-            m_led->setRangeRGBf(0, 0, 0, m_numLeds, start_led_right_outer, end_led_right_outer);
-            ros::Duration(goal->fast_duration_off).sleep();
-
-            // Blink the inner subsections
-            m_led->setRangeRGBf(goal->color_inner.r, goal->color_inner.g, goal->color_inner.b, m_numLeds, start_led_left_inner, end_led_left_inner);
-            m_led->setRangeRGBf(goal->color_inner.r, goal->color_inner.g, goal->color_inner.b, m_numLeds, start_led_right_inner, end_led_right_inner);
-            ros::Duration(goal->fast_duration_on).sleep();
-
-            m_led->setRangeRGBf(0, 0, 0, m_numLeds, start_led_left_inner, end_led_left_inner);
-            m_led->setRangeRGBf(0, 0, 0, m_numLeds, start_led_right_inner, end_led_right_inner);
-            ros::Duration(goal->fast_duration_off).sleep();
-
-            // Send feedback
-            feedback.fast_blinks_left = fast_blinks_left;
-            feedback.blinks_left = blinks_left;
-            policeAS.publishFeedback(feedback);
-        }
-
-        // Make a pause before the next set of fast blinks
-        ros::Duration(goal->pause_between_long_blinks).sleep();
-        fast_blinks_left = goal->fast_blinks;
-    }
-
-    m_led->setAllRGBf(0, 0, 0, m_numLeds);
-    result.blinks_left = blinks_left;
-    policeAS.setSucceeded(result);
-}
-
 void IIROB_LED_Base::fourRegionsCallback(const iirob_led::FourRegionsGoal::ConstPtr& goal) {
     iirob_led::FourRegionsFeedback feedback;
     iirob_led::FourRegionsResult result;
@@ -334,15 +243,15 @@ void IIROB_LED_Base::fourRegionsCallback(const iirob_led::FourRegionsGoal::Const
     for(int i = 0; i < goal->blinks; ++i, --blinks_left)
     {
         // Set selected LEDs and turn them on
-        m_led->setRangeRGBf(goal->color1.r, goal->color1.g, goal->color1.b, m_numLeds, start_ledRegion1, end_ledRegion1);
-        m_led->setRangeRGBf(goal->color2.r, goal->color2.g, goal->color2.b, m_numLeds, start_ledRegion2, end_ledRegion2);
-        m_led->setRangeRGBf(goal->color3.r, goal->color3.g, goal->color3.b, m_numLeds, start_ledRegion3, end_ledRegion3);
+        m_led->setRangeRGBf(goal->color1.r, goal->color1.g, goal->color1.b, m_numLeds, start_ledRegion1, end_ledRegion1, true, true, false);
+        m_led->setRangeRGBf(goal->color2.r, goal->color2.g, goal->color2.b, m_numLeds, start_ledRegion2, end_ledRegion2, true, true, false);
+        m_led->setRangeRGBf(goal->color3.r, goal->color3.g, goal->color3.b, m_numLeds, start_ledRegion3, end_ledRegion3, true, true, false);
         m_led->setRangeRGBf(goal->color4.r, goal->color4.g, goal->color4.b, m_numLeds, start_ledRegion4, end_ledRegion4);
         ros::Duration(goal->duration_on).sleep();
         // Set selected LEDs and turn them off
-        m_led->setRangeRGBf(0, 0, 0, m_numLeds, start_ledRegion1, end_ledRegion1);
-        m_led->setRangeRGBf(0, 0, 0, m_numLeds, start_ledRegion2, end_ledRegion2);
-        m_led->setRangeRGBf(0, 0, 0, m_numLeds, start_ledRegion3, end_ledRegion3);
+        m_led->setRangeRGBf(0, 0, 0, m_numLeds, start_ledRegion1, end_ledRegion1, true, true, false);
+        m_led->setRangeRGBf(0, 0, 0, m_numLeds, start_ledRegion2, end_ledRegion2, true, true, false);
+        m_led->setRangeRGBf(0, 0, 0, m_numLeds, start_ledRegion3, end_ledRegion3, true, true, false);
         m_led->setRangeRGBf(0, 0, 0, m_numLeds, start_ledRegion4, end_ledRegion4);
         ros::Duration(goal->duration_off).sleep();
 

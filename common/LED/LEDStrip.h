@@ -41,7 +41,7 @@ namespace iirob_hardware {
 		bool setHue(float* hue, int n, bool log=true);
 
 
-		/** Set RGB value of all leds */
+        /** Set RGB value of a given range of leds */
 		bool setAllRGB(unsigned char red, unsigned char green, unsigned char blue, int n, bool log=true);
 		/** As above, float [0.1], opt. logarithmic scaling */
 		bool setAllRGBf(float red, float green, float blue, int n, bool log=true);
@@ -59,15 +59,57 @@ namespace iirob_hardware {
 		std::vector<float> hueToRGB(float hue);
 
         /////////////////////////////////////// NEW FEATURES ////////////////////////////////////////
-        /** Check if start and end are withing the allowed limits for the LED array */
+        /**
+         * @brief withinRange Check if start and end are withing the allowed limits for the LED array
+         * @param totNumLeds Total number of LEDs
+         * @param start_led Index of the starting LED of the given range
+         * @param end_led Index of the ending LED of the given range
+         * @return Result of the check whether @start_led and @end_led are within the given range (neither can be less than 0 or greater than the value of @totNumLeds)
+         */
         bool withinRange(int totNumLeds, int start_led, int end_led);
 
-        /** Methods for modifying individual parts of the strip */
-        bool setXRangeRGB(unsigned char* rgb, int totNumLeds, int start_led, int end_led, bool log=false, bool checkLimits=true);
-        /** Set RGB value of all leds */
-        bool setRangeRGB(unsigned char red, unsigned char green, unsigned char blue, int totNumLeds, int start_led, int end_led, bool log=true, bool checkLimits=false);
-        /** As above, float [0.1], opt. logarithmic scaling */
-        bool setRangeRGBf(float red, float green, float blue, int totNumLeds, int start_led, int end_led, bool log=true, bool checkLimits=true);
+        // All methods below ofer the optional logarithmic scaling (param: log)
+        /** Set RGB value of a given range of leds - final stage that triggers the actualy transfer of the buffer in its current state; if sendTrigger=false, the buffer will not be sent and will be overwritten (useful for doing multiple changes to the leds and then sending all in one push */
+        /**
+         * @brief setXRangeRGB Set RGB value of a given range of leds with color values (array of unsigned chars). Generates @buf from @rgbtemp
+         * @param rgb Array of RGB colour values in the interval [0..255]
+         * @param totNumLeds Total number of LEDs
+         * @param start_led Index of the starting LED of the given range
+         * @param end_led Index of the ending LED of the given range
+         * @param log Logarithmic scaling
+         * @param checkLimits Check whether @start_led and @end_led are within the limits of the range. Useful only if method is not called indirectly through setRangeRGB(...)
+         * @param sendTrigger  If true (default) sending of the buffer @buf in its current state will be triggered.
+         * @return True if sendTrigger==false or if sendTrigger==true and both send and receive were successful
+         */
+        bool setXRangeRGB(unsigned char* rgb, int totNumLeds, int start_led, int end_led, bool log=false, bool checkLimits=true, bool sendTrigger=false);
+        /**
+         * @brief setRangeRGB Set RGB value of a given range of leds with color values (float). Also handles the different cases based on the values of @start_led and @end_led. This method is usually called indirectly upon calling setRangeRGBf(...)
+         * @param red RGB red color valuee within the limits of the float interval [0..1]
+         * @param green RGB green color valuee within the limits of the float interval [0..1]
+         * @param blue RGB blue color valuee within the limits of the float interval [0..1]
+         * @param totNumLeds Total number of LEDs
+         * @param start_led Index of the starting LED of the given range
+         * @param end_led Index of the ending LED of the given range
+         * @param log Logarithmic scaling
+         * @param checkLimits Check whether @start_led and @end_led are within the limits of the range. Useful only if method is not called indirectly through setRangeRGBf(...)
+         * @param sendTrigger If true (default) sending of the buffer @buf in its current state will be triggered. Note that this has no effect if setXRangeRGB(...) is not called through this method
+         * @return Return value of setXRangeRGB(...)
+         */
+        bool setRangeRGB(unsigned char red, unsigned char green, unsigned char blue, int totNumLeds, int start_led, int end_led, bool log=true, bool checkLimits=false, bool sendTrigger=false);
+        /**
+         * @brief setRangeRGBf Set RGB value of a given range of leds with color values (unsigned char). Generates @rgbtemp
+         * @param red RGB red color valuee within the limits of the interval [0..255]
+         * @param green RGB green color valuee within the limits of the interval [0..255]
+         * @param blue RGB blue color valuee within the limits of the finterval [0..255]
+         * @param totNumLeds Total number of LEDs
+         * @param start_led Index of the starting LED of the given range
+         * @param end_led Index of the ending LED of the given range
+         * @param log Logarithmic scaling
+         * @param checkLimits Check whether @start_led and @end_led are within the limits of the range
+         * @param sendTrigger If true (default) sending of the buffer @buf in its current state will be triggered. Note that this has no effect if setRangeRGB(...) or setXRangeRGB(...) are not called through this method
+         * @return Return value of setRangeRGB(...)
+         */
+        bool setRangeRGBf(float red, float green, float blue, int totNumLeds, int start_led, int end_led, bool log=true, bool checkLimits=true, bool sendTrigger=true);
 
 	private:
 		LEDStrip() {}
@@ -75,8 +117,8 @@ namespace iirob_hardware {
 		SerialPort* com;
 		bool printDebug;
 		int nn;
-		unsigned char buf[MAX_LED*3+4];
-		unsigned char rgbtemp[MAX_LED*3];
+        unsigned char buf[MAX_LED*3+4];     ///< A buffer which contains the raw data that is used to light up the selected LEDs
+        unsigned char rgbtemp[MAX_LED*3];   ///< A buffer which contains intermediary data of the colours that the LEDs will display. It is used for the generation of @buf
 	};
 
 }

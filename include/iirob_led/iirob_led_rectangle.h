@@ -147,6 +147,7 @@ void ForceTorqueNode::updateFTData(const ros::TimerEvent& event)
 class IIROB_LED_Rectangle : public IIROB_LED_Base
 {
 private:
+    actionlib::SimpleActionServer<iirob_led::PoliceAction> policeAS;  ///< Handles Police goal messages
     ros::Subscriber subForce;           ///< Gives visual feedback for the magnitude and direction of an applied force (represented as a 3D vector)
 public:
     /**

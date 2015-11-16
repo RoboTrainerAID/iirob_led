@@ -259,7 +259,7 @@ std::vector<float> LEDStrip::hueToRGB(float hue) {
 
 // TODO Outsource the send() and receive() calls in a separate method; setXRange() etc. would fill a buffer and only upon calling the setXRangeRGBSend() the buffer will be sent to the microcontroller
 // Methods for modifying individual parts of the strip
-bool LEDStrip::setXRangeRGB(unsigned char* rgb, int numLeds, int start_led, int end_led, bool log, bool checkLimits) {
+bool LEDStrip::setXRangeRGB(unsigned char* rgb, int numLeds, int start_led, int end_led, bool log, bool checkLimits, bool sendTrigger) {
     // We make this an optional step to avoid jumping to checkRange() when not required/wanted
     if(checkLimits) {
         if ((numLeds*3+4) > sizeof(buf)) return false;
@@ -279,15 +279,18 @@ bool LEDStrip::setXRangeRGB(unsigned char* rgb, int numLeds, int start_led, int 
 //    buf[(index*3)+2] = led_lut[*rgb+1];
 //    buf[(index*3)+3] = led_lut[*rgb+2];
 
-    buf[numLeds*3+3] = LEDStrip::END;
-    ok &= send(buf, numLeds*3+4);
-	ok &= receive(buf, 1);
-    ok &= (buf[0]==LEDStrip::OK);
+    // Send only when the sendTrigger flag is set
+    if(sendTrigger) {
+        buf[numLeds*3+3] = LEDStrip::END;
+        ok &= send(buf, numLeds*3+4);
+        ok &= receive(buf, 1);
+        ok &= (buf[0]==LEDStrip::OK);
+    }
 
     return ok;
 }
 
-bool LEDStrip::setRangeRGB(unsigned char red, unsigned char green, unsigned char blue, int numLeds, int start_led, int end_led, bool log, bool checkLimits) {
+bool LEDStrip::setRangeRGB(unsigned char red, unsigned char green, unsigned char blue, int numLeds, int start_led, int end_led, bool log, bool checkLimits, bool sendTrigger) {
     // We call these two lines here again because someone might want to call setRangeRGB() directly and not use setRangeRGBf(). However we make this an optional step to avoid jumping
     // to checkRange() when not required/wanted
     if(checkLimits) {
@@ -311,20 +314,20 @@ bool LEDStrip::setRangeRGB(unsigned char red, unsigned char green, unsigned char
         // FIXME Splitting into two calls leads to noticable delays. Try to merge both ranges into a single one and send it via single call.
         // Case when the starting LED comes after the ending one - this happens when a transition [last LED index -> first LED index] occurs
         // In this situation we split the range into two parts - one is from start_led to last LED and the other one - from first LED to end_led
-        bool firstRange = setXRangeRGB(rgbtemp, numLeds, start_led, numLeds, log);
-        bool secondRange = setXRangeRGB(rgbtemp, numLeds, 0, end_led, log);
+        bool firstRange = setXRangeRGB(rgbtemp, numLeds, start_led, numLeds, log, checkLimits, false);
+        bool secondRange = setXRangeRGB(rgbtemp, numLeds, 0, end_led, log, checkLimits, true);
 
         return firstRange && secondRange;
     }
     else if(start_led < end_led) {
         // Case when starting LED comes before the ending one - normal case; nothing special to do here
-        return setXRangeRGB(rgbtemp, numLeds, start_led, end_led, log);
+        return setXRangeRGB(rgbtemp, numLeds, start_led, end_led, log, checkLimits, sendTrigger);
     }
 
-    return setXRangeRGB(rgbtemp, numLeds, start_led, end_led, log);
+    return setXRangeRGB(rgbtemp, numLeds, start_led, end_led, log, checkLimits, sendTrigger);
 }
 
-bool LEDStrip::setRangeRGBf(float red, float green, float blue, int n, int start_led, int end_led, bool log, bool checkLimits) {
+bool LEDStrip::setRangeRGBf(float red, float green, float blue, int n, int start_led, int end_led, bool log, bool checkLimits, bool sendTrigger) {
     // We make this an optional step to avoid jumping to checkRange() when not required/wanted
     if(checkLimits) {
         if (n*3 > sizeof(rgbtemp)) return false;
@@ -332,7 +335,7 @@ bool LEDStrip::setRangeRGBf(float red, float green, float blue, int n, int start
     }
 
     return LEDStrip::setRangeRGB((unsigned char)(red*255.0), (unsigned char)(green*255.0),
-            (unsigned char)(blue*255.0), n, start_led, end_led, log);
+            (unsigned char)(blue*255.0), n, start_led, end_led, log, checkLimits, sendTrigger);
 }
 
 bool LEDStrip::withinRange(int totNumLeds, int start_led, int end_led) {
