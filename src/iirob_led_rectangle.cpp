@@ -4,20 +4,31 @@
 #include "iirob_led_base.h"
 #include "RGBConverter.h"
 
-IIROB_LED_Rectangle::IIROB_LED_Rectangle(ros::NodeHandle nodeHandle, std::string const& _port, int const& _m_numLeds)
+IIROB_LED_Rectangle::IIROB_LED_Rectangle(ros::NodeHandle nodeHandle, std::string const& _port, int const& _m_numLeds, std::string link)
     : policeAS(nodeHandle, "police", boost::bind(&IIROB_LED_Rectangle::policeCallback, this, _1), false),
+      local_frame(link),
       IIROB_LED_Base::IIROB_LED_Base(nodeHandle, _port, _m_numLeds)
 {
     policeAS.start();
     ROS_INFO("police action server started");
     subForce = nodeHandle.subscribe("led_force_rectangle", 10, &IIROB_LED_Rectangle::forceCallback, this);
     ROS_INFO("led_force_rectangle subscriber started");
+    pubForceTransformed = nodeHandle.advertise<iirob_led::DirectionWithForce>("led_force_rectangle_local", 1); // "/leds/..."
+    ROS_INFO("led_force_rectangle_local publisher started");
+
+    // Initialize the tf2-related components
+    buf = new tf2_ros::Buffer();
+    tfl = new tf2_ros::TransformListener(*buf, nodeHandle);
 }
 
 IIROB_LED_Rectangle::~IIROB_LED_Rectangle() {
     ROS_INFO("Shutting down police action server and led_force_rectangle subscriber");
     policeAS.shutdown();
     subForce.shutdown();
+    pubForceTransformed.shutdown();
+
+    delete buf;
+    delete tfl;
 }
 
 // Callbacks for all action servers and subscribers
@@ -25,148 +36,123 @@ void IIROB_LED_Rectangle::forceCallback(const iirob_led::DirectionWithForce::Con
     // Calculate the force
     double x = led_force_msg->force.x;
     double y = led_force_msg->force.y;
+
+    if(x == 0 && y == 0)
+    {
+        ROS_WARN("Both x and y coordinates equal zero which does not allow visualization in 2D space.");
+        return;
+    }
     double force = sqrt(pow(led_force_msg->force.x, 2) + pow(led_force_msg->force.y, 2) + pow(led_force_msg->force.z, 2));
     // Scale the received force to be in the interval between 0 and maxForce (maxFroce rounded up and converted to an integer - it will represent the number of LEDs to be lit)
     // [0] ----- [force] -- [maxForce]
-    //int forceRounded = (int)ceil(force);      // 1.5 becomes 2.0 and then 2
-    int forceRounded = (int)round(force);       // 1.5 becomes 1
+    //int forceRounded = (int)ceil(force);      // 1.5 becomes 2
+    int forceRounded = (int)round(force);       // 1.5 becomes 2 but 1.3 becomes 1
     ROS_INFO("Max force: %d", MAX_FORCE);
     ROS_INFO("Force: %.3f | Rounded and int: %d", force, forceRounded);
-    if(forceRounded > MAX_FORCE) {
+    if(forceRounded > MAX_FORCE)
+    {
         ROS_ERROR("Received force is of greater magnitude than the set upper bound or exceed the numer of LEDs that can be displayed on each side of the platform | forceRounded(%d), forceMax(%d)", forceRounded, MAX_FORCE);
         return;
     }
 
-    // Determine quadrant and corner that will display the force
-    int8_t coordinates;
-    int location;
-
-    // Cases where one of both axes equals zero
-    /*if(x > 0  && y == 0) coordinates = LEFT;
-    else if(x < 0 && y == 0) coordinates = RIGHT;
-    else if(x == 0 && y > 0) coordinates = FRONT;
-    else if(x == 0 && y < 0) coordinates = BACK;
-    // Cases where both axes are unequal zero
-    else if(x > 0 && y > 0) coordinates = QUADRANT_FIRST;
-    else if(x < 0 && y > 0) coordinates = QUADRANT_SECOND;
-    else if(x < 0 && y < 0) coordinates = QUADRANT_THIRD;
-    else if(x > 0 && y < 0) coordinates = QUADRANT_FOURTH;
-    else coordinates = QUADRANT_NONE;*/
-
-    if(x == 0  && y < 0) coordinates = RIGHT;
-    else if(x == 0 && y > 0) coordinates = LEFT;
-    else if(y == 0 && x > 0) coordinates = FRONT;
-    else if(y == 0 && x < 0) coordinates = BACK;
-    // Cases where both axes are unequal zero
-    /*else if(x > 0 && y < 0) coordinates = QUADRANT_FIRST;
-    else if(x > 0 && y > 0) coordinates = QUADRANT_SECOND;
-    else if(x < 0 && y > 0) coordinates = QUADRANT_THIRD;
-    else if(x < 0 && y < 0) coordinates = QUADRANT_FOURTH;
-    else coordinates = QUADRANT_NONE;*/
-
-    ROS_INFO("XY coordinates: [%.3f , %.3f] (direction macro: %d)\t|\tForce (upper limit of %d): %.3f", x, y, coordinates, MAX_FORCE, force);
-
     /*
      * We combine the LED indexing (front right corner: LED[0] ... back right corner: LED[0+108] ... ... ... front right corner: LED[383])
-     * and the quadrants:
+     * and the degrees we get from the atan2 function
+     * We observe two major cases here:
+     * 1)one of the axes is equal to 0 - in this case we don't need to calculate atan2() and we can directly go to the LED indexing part (this can also be done for other scenarios too such as when we hit the corners of the rectangle; see the macros RECT_CORNER_XXX)
+     * 2)both axes are unequal to 0 - in this case we have to calculate atan2()
      *
+     * The way the platform currently moves is as follows:
+     * -y : move to the right (the side where the kinect is mounted)
+     * +y : move to the left
+     * +x : move forwards (the side where the on/off key is)
+     * -x : move backwards
      *
-     */
-    //int startingPointOnStrip = 0;
-    double ledPerDeg = 0;
-    double translationAlongStrip = 0;
-    double angle = 0.;  // Angle in radians
-
-    /*
-     * If the vector does not lie on one of the axes we need to determine the angle it has relative to the coordinate system that we have defined
+     * We define a coordinate system with its center being located in the center of the platform and
+     * its first quadrant (+x,+y) being located at the fron
      *
-     *               FRONT
-     *   [0],[383]    +y        ______SR2
+     *               FRONT (0 DEG)
+     *   [0],[383]    +x        ______SR2
      *         \  _____|_____  / __________unit circle
      *          \/     |     \/ /
      *          /|-----|-----|\/
      *         / |     |     | \
      *         | |     |     | |
-     *LEFT -x__|_|_____0_____|_|__+x RIGHT
-     *         | |     |     | |
-     *         | |     |     | |
+     *LEFT +y__|_|_____0_____|_|__-y RIGHT
+     *(+90 DEG,| |     |     | |     (+270 DEG, 90 DEG)
+     *-270 DEG)| |     |     | |
      *         \ |     |     | /
      *          \|-----|-----|/
      *           \_____|_____/
      *                 |
-     *                -y
+     *                -x
      *               BACK
+     *             (+180 DEG, 180 DEG)
      *
      */
 
-    switch(coordinates) {
-    case QUADRANT_NONE:
-        // If X and Y are equal to 0 we cannot determine the corner hence no point in displaying anything
-        return;
-    case FRONT:
-        location = RECT_FRONT;
-        break;
-    case BACK:
-        location = RECT_BACK;
-        break;
-    case LEFT:
-        location = RECT_LEFT;
-        break;
-    case RIGHT:
-        location = RECT_RIGHT;
-        break;
-
-        // TODO Change coordinate system: new x+ is old y+ and new y+ is old x-
-
-    case QUADRANT_FIRST:
-        angle = atan2(y, x)*180/M_PI;
-        ROS_INFO("Vector angle relative to defined coordinate system: %.3fdeg", angle);
-        location = RECT_CORNER_FRONT_RIGHT;
-        ROS_INFO("Front right");
-        break;
-    case QUADRANT_SECOND:
-        //startingPointOnStrip = RECT_RIGHT+1;
-        //location = starting_point_on_strip+(int)x;
-        angle = atan2(y, x)*180/M_PI;
-        ROS_INFO("Vector angle relative to defined coordinate system: %.3fdeg", angle);
-        location = RECT_CORNER_FRONT_LEFT;
-        ROS_INFO("Front left");
-        break;
-    case QUADRANT_THIRD:
-        angle = atan2(y, x)*180/M_PI;
-        ROS_INFO("Vector angle relative to defined coordinate system: %.3fdeg", angle);
-        location = RECT_CORNER_BACK_LEFT;
-        ROS_INFO("Back left");
-        break;
-    case QUADRANT_FOURTH:
-        angle = atan2(y, x)*180/M_PI;
-        ROS_INFO("Vector angle relative to defined coordinate system: %.3fdeg", angle);
-        location = RECT_CORNER_BACK_RIGHT;
-        ROS_INFO("Back right");
-        break;
+    int direction;
+    double angle;
+    double ledPerDeg;
+    double translationAlongStrip;
+    bool singleAxes = ((!x  && y) || (x && !y));    // If true, then either x or y equal 0
+    if(!singleAxes)
+    {
+        angle = atan2(y,x);  // Angle in radians
+        ledPerDeg = m_numLeds/360.;
+        translationAlongStrip = (angle*180./M_PI) * ledPerDeg;
+        direction = (int)round(RECT_FRONT + translationAlongStrip) % m_numLeds;
+    }
+    else
+    {
+        if(x == 0  && y < 0) direction = RECT_RIGHT;
+        else if(x == 0 && y > 0) direction = RECT_LEFT;
+        else if(y == 0 && x > 0) direction = RECT_FRONT;
+        else if(y == 0 && x < 0) direction = RECT_BACK;
     }
 
-    angle = atan2(y,x); // Note that at this point we have already dismissed the undefined case where x == y == 0 (QUADRANT_NONE)
-    ledPerDeg = m_numLeds/360.;
-    translationAlongStrip = (angle*180./M_PI) * ledPerDeg;
-    location = (int)round(RECT_RIGHT + translationAlongStrip) % m_numLeds;
-    ROS_INFO("Led/Angle: %f | Angle: %frad (=%fdeg) | Translation: %f | location: %d", ledPerDeg, angle, angle*180./M_PI, translationAlongStrip, location);
+    ROS_INFO("XY coordinates: [%.3f , %.3f]\t|\tForce (upper limit of %d): %.3f", x, y, MAX_FORCE, force);
+    ROS_INFO("Led/Angle: %f | Angle: %frad (=%fdeg) | Translation (num of LEDs): %f | location (LED index): %d", ledPerDeg, angle, angle*180./M_PI, translationAlongStrip, direction);
 
     m_led->setAllRGBf(0, 0, 0, m_numLeds);
 
     if(forceRounded == 1)
     {
-        m_led->setRangeRGBf(0, 0, 1, m_numLeds, location, location);
+        m_led->setRangeRGBf(0, 0, 1, m_numLeds, direction, direction);
         return;
     }
 
     forceRounded--;
-    if(location == RECT_CORNER_FRONT_LEFT) {
-        m_led->setRangeRGBf(1, 0, 0, m_numLeds, (m_numLeds-1)-forceRounded, m_numLeds-1);
-        m_led->setRangeRGBf(1, 0, 0, m_numLeds, 0, forceRounded-1);
+
+    m_led->setRangeRGBf(1, 0, 0, m_numLeds,
+                        ((direction - forceRounded) > 0) ? (direction - forceRounded) : m_numLeds - (forceRounded - direction),
+                        (direction + forceRounded),
+                        true, true, false);
+    m_led->setRangeRGBf(0, 0, 1, m_numLeds, direction, direction);
+
+    // Process the transformation information
+    geometry_msgs::Vector3Stamped forceIn, forceOut;
+    forceIn.vector = led_force_msg->force;
+    geometry_msgs::TransformStamped tf_stamped;
+    iirob_led::DirectionWithForce led_force_msg_transformed;
+    try
+    {
+        tf_stamped = buf->lookupTransform(local_frame, led_force_msg_transformed.tf_stamped.header.frame_id, ros::Time(0));
+        tf2::doTransform(forceIn, forceOut, tf_stamped);
+        ROS_INFO("Transforming vec(x: %f, y: %f, z: %f) with trans(x: %f, y: %f, z: %f), rot(x: %f, y: %f, z: %f)",
+                 forceIn.vector.x, forceIn.vector.y, forceIn.vector.z,
+                 tf_stamped.transform.translation.x, tf_stamped.transform.translation.y, tf_stamped.transform.translation.z,
+                 tf_stamped.transform.rotation.x, tf_stamped.transform.rotation.y, tf_stamped.transform.rotation.z);
     }
-    else m_led->setRangeRGBf(1, 0, 0, m_numLeds, location-forceRounded, location+forceRounded);
-    m_led->setRangeRGBf(0, 0, 1, m_numLeds, location, location);
+    catch(tf2::TransformException ex)
+    {
+        ROS_WARN("%s", ex.what());
+    }
+    led_force_msg_transformed.tf_stamped.header = led_force_msg->tf_stamped.header;
+    led_force_msg_transformed.tf_stamped.header.frame_id = local_frame;
+    led_force_msg_transformed.tf_stamped.transform = tf_stamped.transform;
+    led_force_msg_transformed.force = forceOut.vector;
+    pubForceTransformed.publish(led_force_msg_transformed);
 }
 
 void IIROB_LED_Rectangle::policeCallback(const iirob_led::PoliceGoal::ConstPtr& goal) {

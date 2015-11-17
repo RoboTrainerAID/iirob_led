@@ -37,6 +37,45 @@ IIROB_LED_Cross::~IIROB_LED_Cross() {
 
 // Callbacks for all action servers and subscribers
 void IIROB_LED_Cross::forceCallback(const iirob_led::DirectionWithForce::ConstPtr& led_force_msg) {
+    ROS_INFO("Lighting up complete cross");
+    m_led->setRangeRGBf(1, 0, 0, m_numLeds, CROSS_START, CROSS_END);
+    ros::Duration(5).sleep();
+    m_led->setAllRGBf(0, 0, 0, m_numLeds);
+
+    ROS_INFO("Lighting up cross' center");
+    m_led->setRangeRGBf(1, 0, 0, m_numLeds, CROSS_CENTER, CROSS_CENTER);
+    ros::Duration(5).sleep();
+    m_led->setAllRGBf(0, 0, 0, m_numLeds);
+
+    ROS_INFO("Lighting up cross' horizontal");
+    m_led->setRangeRGBf(1, 0, 0, m_numLeds, H_START, H_END);
+    ros::Duration(5).sleep();
+    m_led->setAllRGBf(0, 0, 0, m_numLeds);
+
+    ROS_INFO("Lighting up cross' vertical");
+    m_led->setRangeRGBf(1, 0, 0, m_numLeds, V_START, V_END);
+    ros::Duration(5).sleep();
+    m_led->setAllRGBf(0, 0, 0, m_numLeds);
+
+    ROS_INFO("Lighting up cross' horizontal +x (left)");
+    m_led->setRangeRGBf(1, 0, 0, m_numLeds, H_LEFT_XPLUS_START, H_LEFT_XPLUS_END);
+    ros::Duration(5).sleep();
+    m_led->setAllRGBf(0, 0, 0, m_numLeds);
+
+    ROS_INFO("Lighting up cross' horizontal -x (right)");
+    m_led->setRangeRGBf(1, 0, 0, m_numLeds, H_RIGHT_XMINUS_START, H_RIGHT_XMINUS_END);
+    ros::Duration(5).sleep();
+    m_led->setAllRGBf(0, 0, 0, m_numLeds);
+
+    ROS_INFO("Lighting up cross' vertical +y (top)");
+    m_led->setRangeRGBf(1, 0, 0, m_numLeds, V_UPPER_YPLUS_START, V_UPPER_YPLUS_END);
+    ros::Duration(5).sleep();
+    m_led->setAllRGBf(0, 0, 0, m_numLeds);
+
+    ROS_INFO("Lighting up cross' vertical -y (bottom)");
+    m_led->setRangeRGBf(1, 0, 0, m_numLeds, V_BOTTOM_YMINUS_START, V_BOTTOM_YMINUS_END);
+    ros::Duration(5).sleep();
+    m_led->setAllRGBf(0, 0, 0, m_numLeds);
 }
 
 void IIROB_LED_Cross::policeCallback(const iirob_led::PoliceGoal::ConstPtr& goal) {
@@ -44,9 +83,10 @@ void IIROB_LED_Cross::policeCallback(const iirob_led::PoliceGoal::ConstPtr& goal
     iirob_led::PoliceResult result;
     int blinks_left = goal->blinks;
     int fast_blinks_left = goal->fast_blinks;
-    int start_led = goal->start_led;
-    int end_led = goal->end_led;
-    int num_inner_leds = goal->num_inner_leds;
+    // We hardcode the start, end and number of LEDs for the cross
+    //int start_led = goal->start_led;
+    //int end_led = goal->end_led;
+    //int num_inner_leds = goal->num_inner_leds;
 
     //if(start_led < 0) start_led = 0;
     //if(end_led >= m_numLeds) end_led = m_numLeds;
@@ -55,8 +95,7 @@ void IIROB_LED_Cross::policeCallback(const iirob_led::PoliceGoal::ConstPtr& goal
     int totLength = (end_led - start_led);
 
     // Probably this here needs some rework
-    // TODO Check how this works when the reversed (end_led > start_led) is passed onto this callback. For now force start_led < end_led
-    if(start_led > end_led) { int temp = start_led; start_led = end_led; end_led = temp; }
+    //if(start_led > end_led) { int temp = start_led; start_led = end_led; end_led = temp; }
 
     double half = totLength/2;
     int start_led_left_outer = start_led;

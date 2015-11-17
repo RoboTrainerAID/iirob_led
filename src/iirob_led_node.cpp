@@ -25,7 +25,8 @@ int main(int argc, char **argv)
     std::string port;
     int led_num;
 	bool override;
-    std::string type;         ///< Type specifies which (rectangle or cross LED strip) will be enabled
+    std::string type;         // Type specifies which (rectangle or cross LED strip) will be enabled
+    std::string link;
 
 	ros::init(argc, argv, "iirob_led_node");
     ros::NodeHandle nh("~");
@@ -41,6 +42,7 @@ int main(int argc, char **argv)
     //nh.param<std::string>("port", port, "/dev/ttyUSB1");
     nh.param<int>("led_num", led_num, 1);
     nh.param<bool>("override", override, false);
+    nh.param<std::string>("link", link);
 
     ROS_INFO("IIROB-LED node %s: Setting override to %s", ros::this_node::getName().c_str(), (override ? (char *)"on" : (char *)"off"));
 
@@ -59,7 +61,7 @@ int main(int argc, char **argv)
         if(!type.compare("rectangle")) ROS_INFO("IIROB-LED node %s: Initializing ledNode for rectangular strip on port %s with %d LEDs", ros::this_node::getName().c_str(), port.c_str(), led_num);
         else ROS_INFO("IIROB-LED node %s: Unknown type. Falling back to ledNode for rectangular strip on port %s with %d LEDs", ros::this_node::getName().c_str(), port.c_str(), led_num);
 
-        IIROB_LED_Rectangle *rectangleStrip = new IIROB_LED_Rectangle(nh, port, led_num);
+        IIROB_LED_Rectangle *rectangleStrip = new IIROB_LED_Rectangle(nh, port, led_num, link);
         if(rectangleStrip->getStatus()) rectangleStrip->spin();
         delete rectangleStrip;
     }
