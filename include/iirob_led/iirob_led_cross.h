@@ -11,7 +11,7 @@
 #include <tf2_ros/transform_broadcaster.h>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.h>
 
-#include "iirob_led_rectangle.h" ///< For the class inheritance
+#include "iirob_led_base.h" ///< For the class inheritance
 
 /* SR2 cross devided into quadrants:
  *
@@ -32,11 +32,11 @@
 
 
 // TODO Ask what top, bottom, left and right should represent vector-wise
-#define NONE            0   // x = y = 0
-#define FORWARD_TOP     1   // 1st quadrant: +x, +y
-#define BACKWARD_BOTTOM 2   // 2nd quadrant: -x, +y
-#define LEFT            3   // 3rd quadrant: -x, -y
-#define RIGHT           4   // 4th quadrant: +x, -y
+#define NONE                    0   // x = y = 0
+#define TOP                     1   // +y | corresponds to the +x of the rectangular LED strip (front)
+#define BOTTOM                  2   // -y | corresponds to the -x of the rectangular LED strip (back)
+#define LEFT                    3   // +x | corresponds to the +y of the rectangular LED strip (left)
+#define RIGHT                   4   // -x | corresponds to the -y of the rectangular LED strip (right)
 
 #define H_SIDE                  7
 #define V_SIDE                  8
@@ -65,14 +65,7 @@
 #define V_START                 V_UPPER_YPLUS_START
 #define V_END                   (CROSS_END - 1)
 
-
-/*horizontal_side(7), vertical_side(8),
-  horizontal_no_center(horizontal_side*2), horizontal_all(horizontal_no_center+1),
-  vertical_no_center(vertical_side*2), vertical_all(vertical_no_center+1),
-  led_right(horizontal_side-1), led_left(horizontal_side),
-  led_forward_top(horizontal_side*2),
-  led_center(led_forward_top + vertical_side),
-  led_backward_bottom(led_center + vertical_side)*/
+#define MAX_FORCE_CROSS 8   ///< 7 + 1 (center) LEDs (note that the upper and bottom halves of the vertical LED strip actually have 8 and not 7 (like their horizontal counterparts) but we want to keep the symmetry)
 
 /**
  * @brief The IIROB_LED_Cross class controls the LED strip mounted around the edges of the bottom platform of the SR2
@@ -80,24 +73,15 @@
 class IIROB_LED_Cross : public IIROB_LED_Base
 {
 private:
-    // TODO Move as defines
-    const int horizontal_side;      ///< All horizontal LEDs from corner to center without the center itself
-    const int horizontal_no_center; ///< All horizontal LEDs without the center of the cross
-    const int horizontal_all;       ///< All horizontal LEDs without the center of the cross
-    const int vertical_side;        ///< All vertical LEDs from corner to center without the center itself
-    const int vertical_no_center;   ///< All vertical LEDs without the center of the cross
-    const int vertical_all;         ///< All vertical LEDs including the center of the cross
+    std::string local_frame;
 
-    // Note: The indexing starts from 0 and ends at 383 for the rectangle. However we need not substract -1 for all corners due to the alignment of the strips
-    const int led_right;                    // 6
-    const int led_left;                     // 7
-    const int led_forward_top;              // 14
-    const int led_center;                   // 22
-    const int led_backward_bottom;          // 31
+    tf2_ros::Buffer *buf;
+    tf2_ros::TransformListener *tfl;
 
     // Note: The indexing starts from 0 and ends at 31 for the cross.
     actionlib::SimpleActionServer<iirob_led::PoliceAction> policeAS;  ///< Handles Police goal messages
     ros::Subscriber subForce;           ///< Gives visual feedback for the magnitude and direction of an applied force (represented as a 3D vector)
+    ros::Publisher pubForceTransformed; ///< Publishes the force retrieved by the subscriber but in the local frame
 public:
     /**
      * @brief IIROB_LED_Cross Constructor that initializes the hardware
@@ -105,7 +89,7 @@ public:
      * @param _port Port as string
      * @param _m_numLeds Number of LEDs
      */
-    IIROB_LED_Cross(ros::NodeHandle nodeHandle, std::string const& _port, int const& _m_numLeds);
+    IIROB_LED_Cross(ros::NodeHandle nodeHandle, std::string const& _port, int const& _m_numLeds, std::string link);
 
     /**
      * @brief Destructor turns off all LEDs and shuts down all action servers and subscribers

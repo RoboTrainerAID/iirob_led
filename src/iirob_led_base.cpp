@@ -2,8 +2,6 @@
 #include "RGBConverter.h"
 #include "iirob_led_base.h"
 
-const int IIROB_LED_Base::MAX_FORCE = 100;
-
 IIROB_LED_Base::IIROB_LED_Base(ros::NodeHandle nodeHandle, std::string const& _port, int const& _m_numLeds)
     : m_led(0), m_msec(1),
       port(_port), m_numLeds(_m_numLeds),
@@ -102,6 +100,7 @@ void IIROB_LED_Base::turnLedOnOffCallback(const iirob_led::TurnLedsOnOff::ConstP
 }
 
 void IIROB_LED_Base::blinkyCallback(const iirob_led::BlinkyGoal::ConstPtr& goal) {
+    // FIXME When fade in and out are turned off only LED at index 0 blinks (the rest is lit up all the time throughout the execution of the action)
     iirob_led::BlinkyFeedback feedback;
     iirob_led::BlinkyResult result;
     int blinks_left = goal->blinks;
@@ -149,6 +148,7 @@ void IIROB_LED_Base::blinkyCallback(const iirob_led::BlinkyGoal::ConstPtr& goal)
     ROS_DEBUG("duration_on (%f) will be split into {fade_in: %f | fade_out: %f | full: %f}", goal->duration_on, fade_in_duration, fade_out_duration, new_duration);
 
     // It is advisable to use a single step of 0.01 for the V (in HSV) for low durations. For longer consider also adding a connection to the duration so that the granularity can be increased resulting in some eye candy
+    // TODO Control steps_per_fade_cycle via launch parameter
     const int steps_per_fade_cycle = 100; // hardcoded number of steps per fade cycle; using this we can derive the value of a single step
     double single_step = v / steps_per_fade_cycle;  // this determines the HSV value increment/decrement and is based on the steps per fade cycle
     const double single_step_duration = (goal->duration_on/4) / steps_per_fade_cycle; // the duration of a single step is derived from the duration of the fade cycle devided by the steps per cycle
@@ -159,7 +159,7 @@ void IIROB_LED_Base::blinkyCallback(const iirob_led::BlinkyGoal::ConstPtr& goal)
         v = 0.0;    // Reset value (HSV) since this is the component that we will be working with
         // Fade in phase (if enabled)
         if(fade_in) {
-            ROS_DEBUG("Fade in");
+            ROS_INFO("Fade in");
             for(int current_step = 0; current_step < steps_per_fade_cycle; v += single_step, ++current_step) {
                 RGBConverter::hsvToRgb(h, s, v, &r, &g, &b);
                 m_led->setRangeRGBf(r, g, b, m_numLeds, start_led, end_led);
@@ -169,14 +169,14 @@ void IIROB_LED_Base::blinkyCallback(const iirob_led::BlinkyGoal::ConstPtr& goal)
         }
 
         // Full light phase
-        ROS_DEBUG("Full");
+        ROS_INFO("Full");
         m_led->setRangeRGBf(goal->color.r, goal->color.g, goal->color.b, m_numLeds, start_led, end_led);
         ros::Duration(new_duration).sleep();
 
         v = v_old;
         // Fade out phase (if enabled)
         if(fade_out) {
-            ROS_DEBUG("Fade out");
+            ROS_INFO("Fade out");
             for(int current_step = steps_per_fade_cycle-1; current_step >= 0; v -= single_step, --current_step) {
                 RGBConverter::hsvToRgb(h, s, v, &r, &g, &b);
                 m_led->setRangeRGBf(r, g, b, m_numLeds, start_led, end_led);

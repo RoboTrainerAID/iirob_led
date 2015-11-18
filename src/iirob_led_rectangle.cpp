@@ -13,7 +13,7 @@ IIROB_LED_Rectangle::IIROB_LED_Rectangle(ros::NodeHandle nodeHandle, std::string
     ROS_INFO("police action server started");
     subForce = nodeHandle.subscribe("led_force_rectangle", 10, &IIROB_LED_Rectangle::forceCallback, this);
     ROS_INFO("led_force_rectangle subscriber started");
-    pubForceTransformed = nodeHandle.advertise<iirob_led::DirectionWithForce>("led_force_rectangle_local", 1); // "/leds/..."
+    pubForceTransformed = nodeHandle.advertise<iirob_led::DirectionWithForce>("led_force_rectangle_local", 1);
     ROS_INFO("led_force_rectangle_local publisher started");
 
     // Initialize the tf2-related components
@@ -42,16 +42,16 @@ void IIROB_LED_Rectangle::forceCallback(const iirob_led::DirectionWithForce::Con
         ROS_WARN("Both x and y coordinates equal zero which does not allow visualization in 2D space.");
         return;
     }
-    double force = sqrt(pow(led_force_msg->force.x, 2) + pow(led_force_msg->force.y, 2) + pow(led_force_msg->force.z, 2));
+    double force = sqrt(pow(led_force_msg->force.x, 2) + pow(led_force_msg->force.y, 2)); // + pow(led_force_msg->force.z, 2));
     // Scale the received force to be in the interval between 0 and maxForce (maxFroce rounded up and converted to an integer - it will represent the number of LEDs to be lit)
     // [0] ----- [force] -- [maxForce]
     //int forceRounded = (int)ceil(force);      // 1.5 becomes 2
     int forceRounded = (int)round(force);       // 1.5 becomes 2 but 1.3 becomes 1
-    ROS_INFO("Max force: %d", MAX_FORCE);
+    ROS_INFO("Max force: %d", MAX_FORCE_RECTANGLE);
     ROS_INFO("Force: %.3f | Rounded and int: %d", force, forceRounded);
-    if(forceRounded > MAX_FORCE)
+    if(forceRounded > MAX_FORCE_RECTANGLE)
     {
-        ROS_ERROR("Received force is of greater magnitude than the set upper bound or exceed the numer of LEDs that can be displayed on each side of the platform | forceRounded(%d), forceMax(%d)", forceRounded, MAX_FORCE);
+        ROS_ERROR("Received force is of greater magnitude than the set upper bound or exceed the numer of LEDs that can be displayed on each side of the platform | forceRounded(%d), forceMax(%d)", forceRounded, MAX_FORCE_RECTANGLE);
         return;
     }
 
@@ -111,7 +111,7 @@ void IIROB_LED_Rectangle::forceCallback(const iirob_led::DirectionWithForce::Con
         else if(y == 0 && x < 0) direction = RECT_BACK;
     }
 
-    ROS_INFO("XY coordinates: [%.3f , %.3f]\t|\tForce (upper limit of %d): %.3f", x, y, MAX_FORCE, force);
+    ROS_INFO("XY coordinates: [%.3f , %.3f]\t|\tForce (upper limit of %d): %.3f", x, y, MAX_FORCE_RECTANGLE, force);
     ROS_INFO("Led/Angle: %f | Angle: %frad (=%fdeg) | Translation (num of LEDs): %f | location (LED index): %d", ledPerDeg, angle, angle*180./M_PI, translationAlongStrip, direction);
 
     m_led->setAllRGBf(0, 0, 0, m_numLeds);
@@ -169,11 +169,6 @@ void IIROB_LED_Rectangle::policeCallback(const iirob_led::PoliceGoal::ConstPtr& 
     checkLimits(&start_led, &end_led);
 
     int totLength = (end_led - start_led);
-    ROS_INFO("SETUP COMPLETED");
-
-    // Probably this here needs some rework
-    // TODO Check how this works when the reversed (end_led > start_led) is passed onto this callback. For now force start_led < end_led
-    if(start_led > end_led) { int temp = start_led; start_led = end_led; end_led = temp; }
 
     double half = totLength/2;
     int start_led_left_outer = start_led;

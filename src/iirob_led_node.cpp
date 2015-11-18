@@ -38,8 +38,6 @@ int main(int argc, char **argv)
         ROS_WARN("Given port is empty. Falling back to default: /dev/ttyUSB0");
         nh.param<std::string>("port", port, "/dev/ttyUSB0");
     }
-    // Cross
-    //nh.param<std::string>("port", port, "/dev/ttyUSB1");
     nh.param<int>("led_num", led_num, 1);
     nh.param<bool>("override", override, false);
     nh.param<std::string>("link", link);
@@ -53,7 +51,7 @@ int main(int argc, char **argv)
     nh.getParam("type", type);
     if(!type.compare("cross")) {
         ROS_INFO("IIROB-LED node %s: Initializing ledNode for cross strip on port %s with %d LEDs", ros::this_node::getName().c_str(), port.c_str(), led_num);
-        IIROB_LED_Cross *crossStrip = new IIROB_LED_Cross(nh, port, led_num);
+        IIROB_LED_Cross *crossStrip = new IIROB_LED_Cross(nh, port, led_num, link);
         if(crossStrip->getStatus()) crossStrip->spin();
         delete crossStrip;
     }
