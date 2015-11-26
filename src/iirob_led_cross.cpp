@@ -4,6 +4,47 @@
 
 // TODO Check if everywhere the duration parameter of a message is set properly (value > 0). Otherwise duration takes the default value from the message (=0), which equals infinity and node can only be stopped by escalating to SIGTERM
 
+// CROSS TEST
+/*ROS_INFO("Lighting up complete cross");
+m_led->setRangeRGBf(1, 0, 0, m_numLeds, CROSS_START, CROSS_END);
+ros::Duration(5).sleep();
+m_led->setAllRGBf(0, 0, 0, m_numLeds);
+
+ROS_INFO("Lighting up cross' center");
+m_led->setRangeRGBf(1, 0, 0, m_numLeds, CROSS_CENTER, CROSS_CENTER);
+ros::Duration(5).sleep();
+m_led->setAllRGBf(0, 0, 0, m_numLeds);
+
+ROS_INFO("Lighting up cross' horizontal");
+m_led->setRangeRGBf(1, 0, 0, m_numLeds, H_START, H_END);
+ros::Duration(5).sleep();
+m_led->setAllRGBf(0, 0, 0, m_numLeds);
+
+ROS_INFO("Lighting up cross' vertical");
+m_led->setRangeRGBf(1, 0, 0, m_numLeds, V_START, V_END);
+ros::Duration(5).sleep();
+m_led->setAllRGBf(0, 0, 0, m_numLeds);
+
+ROS_INFO("Lighting up cross' horizontal +x (left)");
+m_led->setRangeRGBf(1, 0, 0, m_numLeds, H_LEFT_XPLUS_START, H_LEFT_XPLUS_END);
+ros::Duration(5).sleep();
+m_led->setAllRGBf(0, 0, 0, m_numLeds);
+
+ROS_INFO("Lighting up cross' horizontal -x (right)");
+m_led->setRangeRGBf(1, 0, 0, m_numLeds, H_RIGHT_XMINUS_START, H_RIGHT_XMINUS_END);
+ros::Duration(5).sleep();
+m_led->setAllRGBf(0, 0, 0, m_numLeds);
+
+ROS_INFO("Lighting up cross' vertical +y (top)");
+m_led->setRangeRGBf(1, 0, 0, m_numLeds, V_UPPER_YPLUS_START, V_UPPER_YPLUS_END);
+ros::Duration(5).sleep();
+m_led->setAllRGBf(0, 0, 0, m_numLeds);
+
+ROS_INFO("Lighting up cross' vertical -y (bottom)");
+m_led->setRangeRGBf(1, 0, 0, m_numLeds, V_BOTTOM_YMINUS_START, V_BOTTOM_YMINUS_END);
+ros::Duration(5).sleep();
+m_led->setAllRGBf(0, 0, 0, m_numLeds);*/
+
 IIROB_LED_Cross::IIROB_LED_Cross(ros::NodeHandle nodeHandle, std::string const& _port, int const& _m_numLeds, std::string link)
     : policeAS(nodeHandle, "police", boost::bind(&IIROB_LED_Cross::policeCallback, this, _1), false),
       local_frame(link),
@@ -33,46 +74,6 @@ IIROB_LED_Cross::~IIROB_LED_Cross() {
 
 // Callbacks for all action servers and subscribers
 void IIROB_LED_Cross::forceCallback(const iirob_led::DirectionWithForce::ConstPtr& led_force_msg) {
-    // TEST
-    /*ROS_INFO("Lighting up complete cross");
-    m_led->setRangeRGBf(1, 0, 0, m_numLeds, CROSS_START, CROSS_END);
-    ros::Duration(5).sleep();
-    m_led->setAllRGBf(0, 0, 0, m_numLeds);
-
-    ROS_INFO("Lighting up cross' center");
-    m_led->setRangeRGBf(1, 0, 0, m_numLeds, CROSS_CENTER, CROSS_CENTER);
-    ros::Duration(5).sleep();
-    m_led->setAllRGBf(0, 0, 0, m_numLeds);
-
-    ROS_INFO("Lighting up cross' horizontal");
-    m_led->setRangeRGBf(1, 0, 0, m_numLeds, H_START, H_END);
-    ros::Duration(5).sleep();
-    m_led->setAllRGBf(0, 0, 0, m_numLeds);
-
-    ROS_INFO("Lighting up cross' vertical");
-    m_led->setRangeRGBf(1, 0, 0, m_numLeds, V_START, V_END);
-    ros::Duration(5).sleep();
-    m_led->setAllRGBf(0, 0, 0, m_numLeds);
-
-    ROS_INFO("Lighting up cross' horizontal +x (left)");
-    m_led->setRangeRGBf(1, 0, 0, m_numLeds, H_LEFT_XPLUS_START, H_LEFT_XPLUS_END);
-    ros::Duration(5).sleep();
-    m_led->setAllRGBf(0, 0, 0, m_numLeds);
-
-    ROS_INFO("Lighting up cross' horizontal -x (right)");
-    m_led->setRangeRGBf(1, 0, 0, m_numLeds, H_RIGHT_XMINUS_START, H_RIGHT_XMINUS_END);
-    ros::Duration(5).sleep();
-    m_led->setAllRGBf(0, 0, 0, m_numLeds);
-
-    ROS_INFO("Lighting up cross' vertical +y (top)");
-    m_led->setRangeRGBf(1, 0, 0, m_numLeds, V_UPPER_YPLUS_START, V_UPPER_YPLUS_END);
-    ros::Duration(5).sleep();
-    m_led->setAllRGBf(0, 0, 0, m_numLeds);
-
-    ROS_INFO("Lighting up cross' vertical -y (bottom)");
-    m_led->setRangeRGBf(1, 0, 0, m_numLeds, V_BOTTOM_YMINUS_START, V_BOTTOM_YMINUS_END);
-    ros::Duration(5).sleep();
-    m_led->setAllRGBf(0, 0, 0, m_numLeds);*/
 
     // Calculate the force
     double x = led_force_msg->force.x;
@@ -87,8 +88,16 @@ void IIROB_LED_Cross::forceCallback(const iirob_led::DirectionWithForce::ConstPt
     double force = sqrt(pow(led_force_msg->force.x, 2) + pow(led_force_msg->force.y, 2));// + pow(led_force_msg->force.z, 2));
     // Scale the received force to be in the interval between 0 and maxForce (maxFroce rounded up and converted to an integer - it will represent the number of LEDs to be lit)
     // [0] ----- [force] -- [maxForce]
-    //int forceRounded = (int)ceil(force);      // 1.5 becomes 2
-    int forceRounded = (int)round(force);       // 1.5 becomes 2 but 1.3 becomes 1
+    int forceRounded = (int)round(force);
+    // Round: (down) X.00...01 = X.49...99 = X | (up) X.50...00 = X.99...99 = X+1
+    double forceRemainder = force - forceRounded; // Store the remainder (if any) which will be used as the V (in HSV) value of the last LED in the range of LEDs that display forceRounded
+
+    if(forceRemainder > 0)  // Example: force = 2.3, forceRounded = 2 => forceRemainder = force - forceRounded = 2.3 - 2 = 0.3 => we have rounded DOWN the force
+        forceRounded++;     // forceRounded++ = 2+1 = 3 => 3 LEDs with last LED using V (in HSV) = 0.3
+    else if(forceRemainder < 0) // Example: force = 2.7, forceRounded = 3 => forceRemainder = force - forceRounded = 2.7 - 3 = -0.3 => we have rounded UP the force
+        forceRemainder = 1 + forceRemainder; // forceRemainder = 1 + (-0.3) = 0.7 => 3 LEDs with the last LED using V (in HSV) = 0.7
+
+    //int forceRounded = (int)round(force);       // 1.5 becomes 2 but 1.3 becomes 1
     ROS_INFO("Max force: %d", MAX_FORCE_CROSS);
     ROS_INFO("Force: %.3f | Rounded and int: %d", force, forceRounded);
     if(forceRounded > MAX_FORCE_CROSS)
@@ -141,6 +150,7 @@ void IIROB_LED_Cross::forceCallback(const iirob_led::DirectionWithForce::ConstPt
 
     m_led->setRangeRGBf(0, 0, 1, m_numLeds, CROSS_CENTER, CROSS_CENTER);
 
+
     // TODO From here on things will be differen for the cross
     /*int direction;
     double angle;
@@ -179,8 +189,7 @@ void IIROB_LED_Cross::forceCallback(const iirob_led::DirectionWithForce::ConstPt
                         ((direction - forceRounded) > 0) ? (direction - forceRounded) : m_numLeds - (forceRounded - direction),
                         (direction + forceRounded),
                         true, true, false);
-    m_led->setRangeRGBf(0, 0, 1, m_numLeds, direction, direction);
-
+    m_led->setRangeRGBf(0, 0, 1, m_numLeds, direction, direction);*/
     // Process the transformation information
     geometry_msgs::Vector3Stamped forceIn, forceOut;
     forceIn.vector = led_force_msg->force;
@@ -203,7 +212,7 @@ void IIROB_LED_Cross::forceCallback(const iirob_led::DirectionWithForce::ConstPt
     led_force_msg_transformed.tf_stamped.header.frame_id = local_frame;
     led_force_msg_transformed.tf_stamped.transform = tf_stamped.transform;
     led_force_msg_transformed.force = forceOut.vector;
-    pubForceTransformed.publish(led_force_msg_transformed);*/
+    pubForceTransformed.publish(led_force_msg_transformed);
 }
 
 void IIROB_LED_Cross::policeCallback(const iirob_led::PoliceGoal::ConstPtr& goal) {

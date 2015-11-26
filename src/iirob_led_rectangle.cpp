@@ -45,13 +45,21 @@ void IIROB_LED_Rectangle::forceCallback(const iirob_led::DirectionWithForce::Con
     double force = sqrt(pow(led_force_msg->force.x, 2) + pow(led_force_msg->force.y, 2)); // + pow(led_force_msg->force.z, 2));
     // Scale the received force to be in the interval between 0 and maxForce (maxFroce rounded up and converted to an integer - it will represent the number of LEDs to be lit)
     // [0] ----- [force] -- [maxForce]
-    //int forceRounded = (int)ceil(force);      // 1.5 becomes 2
-    int forceRounded = (int)round(force);       // 1.5 becomes 2 but 1.3 becomes 1
-    ROS_INFO("Max force: %d", MAX_FORCE_RECTANGLE);
+    int forceRounded = (int)round(force);
+    // Round: (down) X.00...01 = X.49...99 = X | (up) X.50...00 = X.99...99 = X+1
+    double forceRemainder = force - forceRounded; // Store the remainder (if any) which will be used as the V (in HSV) value of the last LED in the range of LEDs that display forceRounded
+
+    if(forceRemainder > 0)  // Example: force = 2.3, forceRounded = 2 => forceRemainder = force - forceRounded = 2.3 - 2 = 0.3 => we have rounded DOWN the force
+        forceRounded++;     // forceRounded++ = 2+1 = 3 => 3 LEDs with last LED using V (in HSV) = 0.3
+    else if(forceRemainder < 0) // Example: force = 2.7, forceRounded = 3 => forceRemainder = force - forceRounded = 2.7 - 3 = -0.3 => we have rounded UP the force
+        forceRemainder = 1 + forceRemainder; // forceRemainder = 1 + (-0.3) = 0.7 => 3 LEDs with the last LED using V (in HSV) = 0.7
+
+    //int forceRounded = (int)round(force);       // 1.5 becomes 2 but 1.3 becomes 1
+    ROS_INFO("Max force: %d", MAX_RECTANGLE);
     ROS_INFO("Force: %.3f | Rounded and int: %d", force, forceRounded);
-    if(forceRounded > MAX_FORCE_RECTANGLE)
+    if(forceRounded > MAX_RECTANGLE)
     {
-        ROS_ERROR("Received force is of greater magnitude than the set upper bound or exceed the numer of LEDs that can be displayed on each side of the platform | forceRounded(%d), forceMax(%d)", forceRounded, MAX_FORCE_RECTANGLE);
+        ROS_ERROR("Received force is of greater magnitude than the set upper bound or exceed the numer of LEDs that can be displayed on each side of the platform | forceRounded(%d), forceMax(%d)", forceRounded, MAX_RECTANGLE);
         return;
     }
 
@@ -111,23 +119,49 @@ void IIROB_LED_Rectangle::forceCallback(const iirob_led::DirectionWithForce::Con
         else if(y == 0 && x < 0) direction = RECT_BACK;
     }
 
-    ROS_INFO("XY coordinates: [%.3f , %.3f]\t|\tForce (upper limit of %d): %.3f", x, y, MAX_FORCE_RECTANGLE, force);
+    ROS_INFO("XY coordinates: [%.3f , %.3f]\t|\tForce (upper limit of %d): %.3f", x, y, MAX_RECTANGLE, force);
     ROS_INFO("Led/Angle: %f | Angle: %frad (=%fdeg) | Translation (num of LEDs): %f | location (LED index): %d", ledPerDeg, angle, angle*180./M_PI, translationAlongStrip, direction);
 
     m_led->setAllRGBf(0, 0, 0, m_numLeds);
 
     if(forceRounded == 1)
     {
-        m_led->setRangeRGBf(0, 0, 1, m_numLeds, direction, direction);
+        float r = 0, g = 0, b = 1;  //TODO add colour control via the action itself
+
+        if(forceRemainder != 0)
+        {
+            float h, s, v;
+            RGBConverter::rgbToHsv(r, g, b, &h, &s, &v);
+            v = forceRemainder; // Use the remainder as V
+            RGBConverter::hsvToRgb(h, s, v, &r, &g, &b);
+        }
+        m_led->setRangeRGBf(r, g, b, m_numLeds, direction, direction);
         return;
     }
 
     forceRounded--;
 
-    m_led->setRangeRGBf(1, 0, 0, m_numLeds,
+    //TODO add colour control via the action itself
+    float r = 1, g = 0, b = 0;
+    m_led->setRangeRGBf(r, g, b, m_numLeds,
                         ((direction - forceRounded) > 0) ? (direction - forceRounded) : m_numLeds - (forceRounded - direction),
                         (direction + forceRounded),
                         true, true, false);
+    if(forceRemainder != 0)
+    {
+        float h, s, v;
+        RGBConverter::rgbToHsv(r, g, b, &h, &s, &v);
+        v = forceRemainder; // Use the remainder as V
+        RGBConverter::hsvToRgb(h, s, v, &r, &g, &b);
+        // First and last LED in the range of LEDs use the fourceRemainder as their V (in HSV)
+        m_led->setRangeRGBf(r, g, b, m_numLeds,
+                            ((direction - forceRounded) > 0) ? (direction - forceRounded) : m_numLeds - (forceRounded - direction),
+                            ((direction - forceRounded) > 0) ? (direction - forceRounded) : m_numLeds - (forceRounded - direction));
+        m_led->setRangeRGBf(r, g, b, m_numLeds,
+                            (direction + forceRounded),
+                            (direction + forceRounded));
+    }
+
     m_led->setRangeRGBf(0, 0, 1, m_numLeds, direction, direction);
 
     // Process the transformation information
@@ -206,20 +240,22 @@ void IIROB_LED_Rectangle::policeCallback(const iirob_led::PoliceGoal::ConstPtr& 
             // Blink the outer subsections
             m_led->setRangeRGBf(goal->color_outer.r, goal->color_outer.g, goal->color_outer.b, m_numLeds, start_led_left_outer, end_led_left_outer, true, true, false);
             m_led->setRangeRGBf(goal->color_outer.r, goal->color_outer.g, goal->color_outer.b, m_numLeds, start_led_right_outer, end_led_right_outer);
-            ros::Duration(goal->fast_duration_on).sleep();
+            ros::Duration(0.5).sleep();
 
             m_led->setRangeRGBf(0, 0, 0, m_numLeds, start_led_left_outer, end_led_left_outer, true, true, false);
             m_led->setRangeRGBf(0, 0, 0, m_numLeds, start_led_right_outer, end_led_right_outer);
-            ros::Duration(goal->fast_duration_off).sleep();
+            ros::Duration(0.05).sleep();
 
             // Blink the inner subsections
             m_led->setRangeRGBf(goal->color_inner.r, goal->color_inner.g, goal->color_inner.b, m_numLeds, start_led_left_inner, end_led_left_inner, true, true, false);
             m_led->setRangeRGBf(goal->color_inner.r, goal->color_inner.g, goal->color_inner.b, m_numLeds, start_led_right_inner, end_led_right_inner);
-            ros::Duration(goal->fast_duration_on).sleep();
+            //ros::Duration(goal->fast_duration_on).sleep();
+            ros::Duration(0.5).sleep();
 
             m_led->setRangeRGBf(0, 0, 0, m_numLeds, start_led_left_inner, end_led_left_inner, true, true, false);
             m_led->setRangeRGBf(0, 0, 0, m_numLeds, start_led_right_inner, end_led_right_inner);
-            ros::Duration(goal->fast_duration_off).sleep();
+            //ros::Duration(goal->fast_duration_off).sleep();
+            ros::Duration(0.05).sleep();
 
             // Send feedback
             feedback.fast_blinks_left = fast_blinks_left;
@@ -228,7 +264,8 @@ void IIROB_LED_Rectangle::policeCallback(const iirob_led::PoliceGoal::ConstPtr& 
         }
 
         // Make a pause before the next set of fast blinks
-        ros::Duration(goal->pause_between_long_blinks).sleep();
+        //ros::Duration(goal->pause_between_long_blinks).sleep();
+        ros::Duration(2.0).sleep();
         fast_blinks_left = goal->fast_blinks;
     }
 
