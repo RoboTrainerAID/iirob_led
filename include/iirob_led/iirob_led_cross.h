@@ -1,5 +1,5 @@
-#ifndef IIROB_LED_Cross_H
-#define IIROB_LED_Cross_H
+#ifndef IIROB_LED_CROSS_H
+#define IIROB_LED_CROSS_H
 #include <iirob_led/PoliceAction.h>
 #include <iirob_led/DirectionWithForce.h>
 
@@ -74,6 +74,7 @@ class IIROB_LED_Cross : public IIROB_LED_Base
 {
 private:
     std::string local_frame;
+    double max_force;
 
     tf2_ros::Buffer *buf;
     tf2_ros::TransformListener *tfl;
@@ -89,7 +90,7 @@ public:
      * @param _port Port as string
      * @param _m_numLeds Number of LEDs
      */
-    IIROB_LED_Cross(ros::NodeHandle nodeHandle, std::string const& _port, int const& _m_numLeds, std::string link);
+    IIROB_LED_Cross(ros::NodeHandle nodeHandle, std::string const& _port, int const& _m_numLeds, std::string link, double max_force);
 
     /**
      * @brief Destructor turns off all LEDs and shuts down all action servers and subscribers
@@ -110,4 +111,4 @@ public:
     void policeCallback(const iirob_led::PoliceGoal::ConstPtr& goal);
 };
 
-#endif // IIROB_LED_Cross_H
+#endif // IIROB_LED_CROSS_H

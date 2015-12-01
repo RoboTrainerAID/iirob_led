@@ -2,11 +2,13 @@
 #include <math.h>
 #include "iirob_led_rectangle.h"
 #include "iirob_led_base.h"
+#include "iirob_led_math.h"
 #include "RGBConverter.h"
 
-IIROB_LED_Rectangle::IIROB_LED_Rectangle(ros::NodeHandle nodeHandle, std::string const& _port, int const& _m_numLeds, std::string link)
+IIROB_LED_Rectangle::IIROB_LED_Rectangle(ros::NodeHandle nodeHandle, std::string const& _port, int const& _m_numLeds, std::string link, double _max_force)
     : policeAS(nodeHandle, "police", boost::bind(&IIROB_LED_Rectangle::policeCallback, this, _1), false),
       local_frame(link),
+      max_force(_max_force),
       IIROB_LED_Base::IIROB_LED_Base(nodeHandle, _port, _m_numLeds)
 {
     policeAS.start();
@@ -55,11 +57,11 @@ void IIROB_LED_Rectangle::forceCallback(const iirob_led::DirectionWithForce::Con
         forceRemainder = 1 + forceRemainder; // forceRemainder = 1 + (-0.3) = 0.7 => 3 LEDs with the last LED using V (in HSV) = 0.7
 
     //int forceRounded = (int)round(force);       // 1.5 becomes 2 but 1.3 becomes 1
-    ROS_INFO("Max force: %d", MAX_RECTANGLE);
+    ROS_INFO("Max force: %d", MAX_FORCE_RECTANGLE);
     ROS_INFO("Force: %.3f | Rounded and int: %d", force, forceRounded);
-    if(forceRounded > MAX_RECTANGLE)
+    if(forceRounded > MAX_FORCE_RECTANGLE)
     {
-        ROS_ERROR("Received force is of greater magnitude than the set upper bound or exceed the numer of LEDs that can be displayed on each side of the platform | forceRounded(%d), forceMax(%d)", forceRounded, MAX_RECTANGLE);
+        ROS_ERROR("Received force is of greater magnitude than the set upper bound or exceed the numer of LEDs that can be displayed on each side of the platform | forceRounded(%d), forceMax(%d)", forceRounded, MAX_FORCE_RECTANGLE);
         return;
     }
 
@@ -119,7 +121,7 @@ void IIROB_LED_Rectangle::forceCallback(const iirob_led::DirectionWithForce::Con
         else if(y == 0 && x < 0) direction = RECT_BACK;
     }
 
-    ROS_INFO("XY coordinates: [%.3f , %.3f]\t|\tForce (upper limit of %d): %.3f", x, y, MAX_RECTANGLE, force);
+    ROS_INFO("XY coordinates: [%.3f , %.3f]\t|\tForce (upper limit of %d): %.3f", x, y, MAX_FORCE_RECTANGLE, force);
     ROS_INFO("Led/Angle: %f | Angle: %frad (=%fdeg) | Translation (num of LEDs): %f | location (LED index): %d", ledPerDeg, angle, angle*180./M_PI, translationAlongStrip, direction);
 
     m_led->setAllRGBf(0, 0, 0, m_numLeds);

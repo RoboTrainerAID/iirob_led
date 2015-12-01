@@ -66,7 +66,7 @@
 #define RECT_CORNER_BACK_RIGHT      ((RECT_LONG_SIDE - 1) + RECT_SHORT_SIDE)
 #define RECT_CORNER_BACK_LEFT       (RECT_LONG_SIDE)
 
-#define MAX_RECTANGLE 12
+#define MAX_FORCE_RECTANGLE 12
 
 /**
  * @brief The IIROB_LED_Rectangle class controls the LED strip mounted around the edges of the bottom platform of the SR2
@@ -75,6 +75,7 @@ class IIROB_LED_Rectangle : public IIROB_LED_Base
 {
 private:
     std::string local_frame;
+    double max_force;
 
     tf2_ros::Buffer *buf;
     tf2_ros::TransformListener *tfl;
@@ -89,7 +90,7 @@ public:
      * @param _port Port as string
      * @param _m_numLeds Number of LEDs
      */
-    IIROB_LED_Rectangle(ros::NodeHandle nodeHandle, std::string const& _port, int const& _m_numLeds, std::string link);
+    IIROB_LED_Rectangle(ros::NodeHandle nodeHandle, std::string const& _port, int const& _m_numLeds, std::string link, double max_force);
 
     /**
      * @brief Destructor turns off all LEDs and shuts down all action servers and subscribers

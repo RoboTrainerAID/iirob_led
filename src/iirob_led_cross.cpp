@@ -1,5 +1,6 @@
 #include <cmath>
 #include "iirob_led_cross.h"
+#include "iirob_led_math.h"
 #include "RGBConverter.h"
 
 // TODO Check if everywhere the duration parameter of a message is set properly (value > 0). Otherwise duration takes the default value from the message (=0), which equals infinity and node can only be stopped by escalating to SIGTERM
@@ -45,9 +46,10 @@ m_led->setRangeRGBf(1, 0, 0, m_numLeds, V_BOTTOM_YMINUS_START, V_BOTTOM_YMINUS_E
 ros::Duration(5).sleep();
 m_led->setAllRGBf(0, 0, 0, m_numLeds);*/
 
-IIROB_LED_Cross::IIROB_LED_Cross(ros::NodeHandle nodeHandle, std::string const& _port, int const& _m_numLeds, std::string link)
+IIROB_LED_Cross::IIROB_LED_Cross(ros::NodeHandle nodeHandle, std::string const& _port, int const& _m_numLeds, std::string link, double _max_force)
     : policeAS(nodeHandle, "police", boost::bind(&IIROB_LED_Cross::policeCallback, this, _1), false),
       local_frame(link),
+      max_force(_max_force),
       IIROB_LED_Base::IIROB_LED_Base(nodeHandle, _port, _m_numLeds)
 {
     policeAS.start();
@@ -142,6 +144,7 @@ void IIROB_LED_Cross::forceCallback(const iirob_led::DirectionWithForce::ConstPt
     }
     else
     {
+        // TODO Change this to show the X,Y position + add scaling (0..max_force -> 0..#LEDs)
         if(x == 0 && y < 0) m_led->setRangeRGBf(1, 0, 0, m_numLeds, V_BOTTOM_YMINUS_START, V_BOTTOM_YMINUS_START - 1 + forceRounded);
         else if(x == 0 && y > 0) m_led->setRangeRGBf(1, 0, 0, m_numLeds, V_UPPER_YPLUS_START + (V_SIDE - forceRounded), V_UPPER_YPLUS_END);
         else if(y == 0 && x > 0) m_led->setRangeRGBf(1, 0, 0, m_numLeds, H_LEFT_XPLUS_START, H_LEFT_XPLUS_START - 1 + forceRounded);
@@ -150,46 +153,6 @@ void IIROB_LED_Cross::forceCallback(const iirob_led::DirectionWithForce::ConstPt
 
     m_led->setRangeRGBf(0, 0, 1, m_numLeds, CROSS_CENTER, CROSS_CENTER);
 
-
-    // TODO From here on things will be differen for the cross
-    /*int direction;
-    double angle;
-    double ledPerDeg;
-    double translationAlongStrip;
-    bool singleAxes = ((!x  && y) || (x && !y));    // If true, then either x or y equal 0
-    if(!singleAxes)
-    {
-        angle = atan2(y,x);  // Angle in radians
-        ledPerDeg = m_numLeds/360.;
-        translationAlongStrip = (angle*180./M_PI) * ledPerDeg;
-        direction = (int)round(RECT_FRONT + translationAlongStrip) % m_numLeds;
-    }
-    else
-    {
-        if(x == 0 && y < 0) direction = RECT_RIGHT;
-        else if(x == 0 && y > 0) direction = RECT_LEFT;
-        else if(y == 0 && x > 0) direction = RECT_FRONT;
-        else if(y == 0 && x < 0) direction = RECT_BACK;
-    }
-
-    ROS_INFO("XY coordinates: [%.3f , %.3f]\t|\tForce (upper limit of %d): %.3f", x, y, MAX_FORCE_CROSS, force);
-    ROS_INFO("Led/Angle: %f | Angle: %frad (=%fdeg) | Translation (num of LEDs): %f | location (LED index): %d", ledPerDeg, angle, angle*180./M_PI, translationAlongStrip, direction);
-
-    m_led->setAllRGBf(0, 0, 0, m_numLeds);
-
-    if(forceRounded == 1)
-    {
-        m_led->setRangeRGBf(0, 0, 1, m_numLeds, direction, direction);
-        return;
-    }
-
-    forceRounded--;
-
-    m_led->setRangeRGBf(1, 0, 0, m_numLeds,
-                        ((direction - forceRounded) > 0) ? (direction - forceRounded) : m_numLeds - (forceRounded - direction),
-                        (direction + forceRounded),
-                        true, true, false);
-    m_led->setRangeRGBf(0, 0, 1, m_numLeds, direction, direction);*/
     // Process the transformation information
     geometry_msgs::Vector3Stamped forceIn, forceOut;
     forceIn.vector = led_force_msg->force;
@@ -220,6 +183,7 @@ void IIROB_LED_Cross::policeCallback(const iirob_led::PoliceGoal::ConstPtr& goal
     iirob_led::PoliceResult result;
     int blinks_left = goal->blinks;
     int fast_blinks_left = goal->fast_blinks;
+    //double fast_duration = goal;
     // NOTE: We ignore the start, end and number of LEDs and hardcode the behaviour for this action
 
     int j;
