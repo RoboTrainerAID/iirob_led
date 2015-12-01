@@ -1,4 +1,4 @@
-#include <cmath>
+//#include <cmath>
 #include "iirob_led_cross.h"
 #include "iirob_led_math.h"
 #include "RGBConverter.h"
@@ -48,8 +48,8 @@ m_led->setAllRGBf(0, 0, 0, m_numLeds);*/
 
 IIROB_LED_Cross::IIROB_LED_Cross(ros::NodeHandle nodeHandle, std::string const& _port, int const& _m_numLeds, std::string link, double _max_force)
     : policeAS(nodeHandle, "police", boost::bind(&IIROB_LED_Cross::policeCallback, this, _1), false),
-      local_frame(link),
-      max_force(_max_force),
+      localFrame(link),
+      maxForce(_max_force),
       IIROB_LED_Base::IIROB_LED_Base(nodeHandle, _port, _m_numLeds)
 {
     policeAS.start();
@@ -58,7 +58,6 @@ IIROB_LED_Cross::IIROB_LED_Cross(ros::NodeHandle nodeHandle, std::string const& 
     subForce = nodeHandle.subscribe("led_force_cross", 10, &IIROB_LED_Cross::forceCallback, this);
     pubForceTransformed = nodeHandle.advertise<iirob_led::DirectionWithForce>("led_force_cross_local", 1);
     ROS_INFO("led_force_cross_local publisher started");
-
 
     // Initialize the tf2-related components
     buf = new tf2_ros::Buffer();
@@ -87,24 +86,30 @@ void IIROB_LED_Cross::forceCallback(const iirob_led::DirectionWithForce::ConstPt
         return;
     }
 
+    /*// First we calculate the force
     double force = sqrt(pow(led_force_msg->force.x, 2) + pow(led_force_msg->force.y, 2));// + pow(led_force_msg->force.z, 2));
-    // Scale the received force to be in the interval between 0 and maxForce (maxFroce rounded up and converted to an integer - it will represent the number of LEDs to be lit)
-    // [0] ----- [force] -- [maxForce]
-    int forceRounded = (int)round(force);
-    // Round: (down) X.00...01 = X.49...99 = X | (up) X.50...00 = X.99...99 = X+1
-    double forceRemainder = force - forceRounded; // Store the remainder (if any) which will be used as the V (in HSV) value of the last LED in the range of LEDs that display forceRounded
+    // Next we scale up/down the given force by converting it from the range [0..max_force] to the range [0..MAX_NUM_LEDS_CROSS]
+    // [0] ----- [force] -- [max_force] => [0] ----- [force_scaled] -- [MAX_NUM_LEDS_CROSS]
+    double forceScaled = convert(&scalingFactor, 0, max_force, 0, MAX_NUM_LEDS_CROSS, force);
+    ROS_INFO("Scaling force %.3f from [0..%.3f] to [0..%d] : %.3f ", force, max_force, MAX_NUM_LEDS_CROSS, forceScaled);
 
-    if(forceRemainder > 0)  // Example: force = 2.3, forceRounded = 2 => forceRemainder = force - forceRounded = 2.3 - 2 = 0.3 => we have rounded DOWN the force
+    // Third we calculate the remainder using the scaled force; note that forceRounded represent the number of LEDs that will be lit
+    int forceRounded = round(forceScaled);
+    // Round: (down) X.00...01 = X.49...99 = X | (up) X.50...00 = X.99...99 = X+1
+    ROS_INFO("Rounding scaled force %.3f and converting to int: %d", forceScaled, forceRounded);
+
+    // Store the remainder (if any) which will be used as the V (in HSV) value of the last LED in the range of LEDs that display forceRounded
+    double forceRemainder = forceScaled - forceRounded;
+
+    // We need to check whether the remainder is > or < 0; the case when it's equal to 0 is not interesting
+    if(forceRemainder > 0)  // Example: force = 2.3, forceRounded = 2 => forceRemainder = forceScaled - forceRounded = 2.3 - 2 = 0.3 => we have rounded DOWN forceScaled
         forceRounded++;     // forceRounded++ = 2+1 = 3 => 3 LEDs with last LED using V (in HSV) = 0.3
-    else if(forceRemainder < 0) // Example: force = 2.7, forceRounded = 3 => forceRemainder = force - forceRounded = 2.7 - 3 = -0.3 => we have rounded UP the force
+    else if(forceRemainder < 0) // Example: force = 2.7, forceRounded = 3 => forceRemainder = forceScaled - forceRounded = 2.7 - 3 = -0.3 => we have rounded UP forceScaled
         forceRemainder = 1 + forceRemainder; // forceRemainder = 1 + (-0.3) = 0.7 => 3 LEDs with the last LED using V (in HSV) = 0.7
 
-    //int forceRounded = (int)round(force);       // 1.5 becomes 2 but 1.3 becomes 1
-    ROS_INFO("Max force: %d", MAX_FORCE_CROSS);
-    ROS_INFO("Force: %.3f | Rounded and int: %d", force, forceRounded);
-    if(forceRounded > MAX_FORCE_CROSS)
+    if(forceRounded > MAX_NUM_LEDS_CROSS)
     {
-        ROS_ERROR("Received force is of greater magnitude than the set upper bound or exceed the numer of LEDs that can be displayed on each side of the platform | forceRounded(%d), forceMax(%d)", forceRounded, MAX_FORCE_CROSS);
+        ROS_ERROR("Received force is of greater magnitude than the set upper bound or exceed the numer of LEDs that can be displayed on each side of the platform | forceRounded(%d), forceMax(%d)", forceRounded, MAX_NUM_LEDS_CROSS);
         return;
     }
 
@@ -151,7 +156,141 @@ void IIROB_LED_Cross::forceCallback(const iirob_led::DirectionWithForce::ConstPt
         else if(y == 0 && x < 0) m_led->setRangeRGBf(1, 0, 0, m_numLeds, H_RIGHT_XMINUS_START + (H_SIDE - forceRounded), H_RIGHT_XMINUS_END);
     }
 
-    m_led->setRangeRGBf(0, 0, 1, m_numLeds, CROSS_CENTER, CROSS_CENTER);
+    m_led->setRangeRGBf(0, 0, 1, m_numLeds, CROSS_CENTER, CROSS_CENTER);*/
+
+/*    // Round the original x and y
+    // Round: (down) X.00...01 = X.49...99 = X | (up) X.50...00 = X.99...99 = X+1
+    double xRounded = round(x);
+    double yRounded = round(y);
+
+    // If remainder > 0 that means that we have rounded DOWN so we need to increase by 1 (we can't have for example 1/3 LED ;))
+    if((x - xRounded) > 0) xRounded++;
+    if((y - yRounded) > 0) yRounded++;*/
+
+    double force = getVector2dLenght(x, y);
+    if(force > maxForce)
+    {
+        ROS_ERROR("Force %.3f (using rounded x and y) exceeds specified maximum force %.3f", force, maxForce);
+        return;
+    }
+
+    ROS_INFO("Force: %.3f | x(%f), y(%f)", force, x, y);
+
+    // Scale up/down the rounded x and y so that these two fit in the range [0..MAX_NUM_LEDS_CROSS].
+    // [0] ----- [force] -- [max_force] => [0] ----- [force_scaled] -- [MAX_NUM_LEDS_CROSS]
+    double xScaled = convert(&scalingFactor, 0, maxForce, 0, MAX_NUM_LEDS_CROSS, abs(x));
+    double yScaled = convert(&scalingFactor, 0, maxForce, 0, MAX_NUM_LEDS_CROSS, abs(y));
+
+    // We get the remainders using the scaled x and y values. The remainder is use for the V (in HSV) value of the last LED on each axis (x and y)
+    double xScaledRemainder = fmod(xScaled, 1);//getRemainder(xScaled);
+    double yScaledRemainder = fmod(yScaled, 1);//getRemainder(yScaled);
+    // TODO See why getRemainder() returns 0
+
+    ROS_INFO(" ### Scaled: x(%f), y(%f) | Remainders: x(%f), y(%f)", xScaled, yScaled, xScaledRemainder, yScaledRemainder);
+
+    if((xScaled - xScaledRemainder) > 0) xScaled++;
+    if((yScaled - yScaledRemainder) > 0) yScaled++;
+
+    float r = 1.0, rX, rY;
+    float g = 0.0, gX, gY;
+    float b = 0.0, bX, bY;
+    float h, s, v, vX, vY;
+
+    // Convert to HSV
+    RGBConverter::rgbToHsv(r, g, b, &h, &s, &v);
+    // Use the remainders for the V (in HSV) of their corresponding axes
+    vX = xScaledRemainder;
+    vY = yScaledRemainder;
+    // Convert back to RGB
+    RGBConverter::hsvToRgb(h, s, vX, &rX, &gX, &bX);
+    RGBConverter::hsvToRgb(h, s, vY, &rY, &gY, &bY);
+
+    ROS_INFO(" @@@ X: rbg[%f, %f, %f] -> hsv[%f, %f, %f] -> set V -> hsv[%f, %f, %f] -> rgb[%f, %f, %f]",
+             r, g, b,
+             h, s, v,
+             h, s, vX,
+             rX, gX, bX);
+    ROS_INFO(" @@@ Y: rbg[%f, %f, %f] -> hsv[%f, %f, %f] -> set V -> hsv[%f, %f, %f] -> rgb[%f, %f, %f]",
+             r, g, b,
+             h, s, v,
+             h, s, vY,
+             rY, gY, bY);
+
+    m_led->setAllRGBf(0, 0, 0, m_numLeds);
+
+    if(abs(x) <= 1 && abs(y) <= 1)
+    {
+        m_led->setRangeRGBf(r, g, b, m_numLeds, CROSS_CENTER, CROSS_CENTER);
+        return;
+    }
+
+    int xScaledInt = abs(round(xScaled));
+    int yScaledInt = abs(round(yScaled));
+
+    ROS_INFO("Scaled: x=%.3f, y=%.3f | Rounded: x=%d, y=%d", xScaled, yScaled, xScaledInt, yScaledInt);
+
+    // We exclude 1 LED on each axis since we also light up the central LED
+    //xScaledInt--;
+    //yScaledInt--;
+
+    if(x > 0 && y > 0)
+    {
+        m_led->setRangeRGBf(r, g, b, m_numLeds, H_LEFT_XPLUS_START, H_LEFT_XPLUS_START - 1 + xScaledInt, true, true, false);                                           // +x
+        m_led->setRangeRGBf(rX, gX, bX, m_numLeds, H_LEFT_XPLUS_START - 1 + xScaledInt, H_LEFT_XPLUS_START - 1 + xScaledInt, true, true, false);                          // +x | LAST
+        m_led->setRangeRGBf(r, g, b, m_numLeds, V_UPPER_YPLUS_START + (V_SIDE - yScaledInt), V_UPPER_YPLUS_END, true, true, false);                                    // +y
+        m_led->setRangeRGBf(rY, gY, bY, m_numLeds, V_UPPER_YPLUS_START + (V_SIDE - yScaledInt), V_UPPER_YPLUS_START + (V_SIDE - yScaledInt), true, true, false);          // +y | LAST
+    }
+    else if(x > 0 && y < 0)
+    {
+        m_led->setRangeRGBf(r, g, b, m_numLeds, H_LEFT_XPLUS_START, H_LEFT_XPLUS_START - 1 + xScaledInt, true, true, false);                                           // +x
+        m_led->setRangeRGBf(rX, gX, bX, m_numLeds, H_LEFT_XPLUS_START - 1 + xScaledInt, H_LEFT_XPLUS_START - 1 + xScaledInt, true, true, false);                          // +x | LAST
+        m_led->setRangeRGBf(r, g, b, m_numLeds, V_BOTTOM_YMINUS_START, V_BOTTOM_YMINUS_START - 1 + yScaledInt, true, true, false);                                     // -y
+        m_led->setRangeRGBf(rY, gY, bY, m_numLeds, V_BOTTOM_YMINUS_START - 1 + yScaledInt, V_BOTTOM_YMINUS_START - 1 + yScaledInt, true, true, false);                    // -y | LAST
+    }
+    else if(x < 0 && y > 0)
+    {
+        m_led->setRangeRGBf(r, g, b, m_numLeds, H_RIGHT_XMINUS_START + (H_SIDE - xScaledInt), H_RIGHT_XMINUS_END, true, true, false);                                  // -x
+        m_led->setRangeRGBf(rX, gX, bX, m_numLeds, H_RIGHT_XMINUS_START + (H_SIDE - xScaledInt), H_RIGHT_XMINUS_START + (H_SIDE - xScaledInt), true, true, false);        // -x | LAST
+        m_led->setRangeRGBf(r, g, b, m_numLeds, V_UPPER_YPLUS_START + (V_SIDE - yScaledInt), V_UPPER_YPLUS_END, true, true, false);                                    // +y
+        m_led->setRangeRGBf(rY, gY, bY, m_numLeds, V_UPPER_YPLUS_START + (V_SIDE - yScaledInt), V_UPPER_YPLUS_START + (V_SIDE - yScaledInt), true, true, false);          // +y | LAST
+    }
+    else if(x < 0 && y < 0)
+    {
+        m_led->setRangeRGBf(r, g, b, m_numLeds, H_RIGHT_XMINUS_START + (H_SIDE - xScaledInt), H_RIGHT_XMINUS_END, true, true, false);                                  // -x
+        m_led->setRangeRGBf(rX, gX, bX, m_numLeds, H_RIGHT_XMINUS_START + (H_SIDE - xScaledInt), H_RIGHT_XMINUS_START + (H_SIDE - xScaledInt), true, true, false);        // -x | LAST
+        m_led->setRangeRGBf(r, g, b, m_numLeds, V_BOTTOM_YMINUS_START, V_BOTTOM_YMINUS_START - 1 + yScaledInt, true, true, false);                                     // -y
+        m_led->setRangeRGBf(rY, gY, bY, m_numLeds, V_BOTTOM_YMINUS_START - 1 + yScaledInt, V_BOTTOM_YMINUS_START - 1 + yScaledInt, true, true, false);                    // -y | LAST
+    }
+    else
+    {
+        // Single axis
+        if(x == 0 && y < 0)
+        {
+            m_led->setRangeRGBf(r, g, b, m_numLeds, V_BOTTOM_YMINUS_START, V_BOTTOM_YMINUS_START - 1 + yScaledInt, true, true, false);
+            m_led->setRangeRGBf(rY, gY, bY, m_numLeds, V_BOTTOM_YMINUS_START - 1 + yScaledInt, V_BOTTOM_YMINUS_START - 1 + yScaledInt, true, true, false);
+        }
+        else if(x == 0 && y > 0)
+        {
+            m_led->setRangeRGBf(r, g, b, m_numLeds, V_UPPER_YPLUS_START + (V_SIDE - yScaledInt), V_UPPER_YPLUS_END, true, true, false);
+            m_led->setRangeRGBf(rY, gY, bY, m_numLeds, V_UPPER_YPLUS_START + (V_SIDE - yScaledInt), V_UPPER_YPLUS_START + (V_SIDE - yScaledInt), true, true, false);
+        }
+        else if(y == 0 && x > 0)
+        {
+            m_led->setRangeRGBf(r, g, b, m_numLeds, H_LEFT_XPLUS_START, H_LEFT_XPLUS_START - 1 + xScaledInt, true, true, false);
+            m_led->setRangeRGBf(rX, gX, bX, m_numLeds, H_LEFT_XPLUS_START - 1 + xScaledInt, H_LEFT_XPLUS_START - 1 + xScaledInt, true, true, false);
+        }
+        else if(y == 0 && x < 0)
+        {
+            m_led->setRangeRGBf(r, g, b, m_numLeds, H_RIGHT_XMINUS_START + (H_SIDE - xScaledInt), H_RIGHT_XMINUS_END, true, true, false);
+            m_led->setRangeRGBf(rX, gX, bX, m_numLeds, H_RIGHT_XMINUS_START + (H_SIDE - xScaledInt), H_RIGHT_XMINUS_START + (H_SIDE - xScaledInt), true, true, false);
+        }
+    }
+
+
+    // Light up t
+
+    // Light up the center
+    m_led->setRangeRGBf(0., 0., 1., m_numLeds, CROSS_CENTER, CROSS_CENTER);
 
     // Process the transformation information
     geometry_msgs::Vector3Stamped forceIn, forceOut;
@@ -160,7 +299,7 @@ void IIROB_LED_Cross::forceCallback(const iirob_led::DirectionWithForce::ConstPt
     iirob_led::DirectionWithForce led_force_msg_transformed;
     try
     {
-        tf_stamped = buf->lookupTransform(local_frame, led_force_msg_transformed.tf_stamped.header.frame_id, ros::Time(0));
+        tf_stamped = buf->lookupTransform(localFrame, led_force_msg_transformed.tf_stamped.header.frame_id, ros::Time(0));
         tf2::doTransform(forceIn, forceOut, tf_stamped);
         ROS_INFO("Transforming vec(x: %f, y: %f, z: %f) with trans(x: %f, y: %f, z: %f), rot(x: %f, y: %f, z: %f)",
                  forceIn.vector.x, forceIn.vector.y, forceIn.vector.z,
@@ -172,7 +311,7 @@ void IIROB_LED_Cross::forceCallback(const iirob_led::DirectionWithForce::ConstPt
         ROS_WARN("%s", ex.what());
     }
     led_force_msg_transformed.tf_stamped.header = led_force_msg->tf_stamped.header;
-    led_force_msg_transformed.tf_stamped.header.frame_id = local_frame;
+    led_force_msg_transformed.tf_stamped.header.frame_id = localFrame;
     led_force_msg_transformed.tf_stamped.transform = tf_stamped.transform;
     led_force_msg_transformed.force = forceOut.vector;
     pubForceTransformed.publish(led_force_msg_transformed);

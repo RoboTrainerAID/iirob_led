@@ -66,7 +66,7 @@
 #define RECT_CORNER_BACK_RIGHT      ((RECT_LONG_SIDE - 1) + RECT_SHORT_SIDE)
 #define RECT_CORNER_BACK_LEFT       (RECT_LONG_SIDE)
 
-#define MAX_FORCE_RECTANGLE 12
+#define MAX_NUM_LEDS_RECTANGLE 12
 
 /**
  * @brief The IIROB_LED_Rectangle class controls the LED strip mounted around the edges of the bottom platform of the SR2
