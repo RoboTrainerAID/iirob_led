@@ -11,7 +11,8 @@
 #include <iirob_led/ChaserLightAction.h>
 #include <iirob_led/SetLedDirectory.h>
 #include <iirob_led/DirectionWithForce.h>
-#include <iirob_led/TurnLedsOnOff.h>
+#include <iirob_led/SetLedRange.h>
+#include <iirob_led/TurnOnOff.h>
 
 #include <std_msgs/String.h>
 #include <std_msgs/ColorRGBA.h>
@@ -52,8 +53,10 @@ protected:
     double _scalingFactor;
     int stepsPerFadeCycle;   ///< Determines the granularity of the fading (the greater the value, the more fluent the HSV fade-effect will be)
     // Subscribers
-    ros::Subscriber subTurnLedsOnOff;   ///< Allows setting given range of (or a single) LEDs to a specific color with (0,0,0) being equal to "turn off"
+    ros::Subscriber subSetLedRange;   ///< Allows setting given range of (or a single) LEDs to a specific color with (0,0,0) being equal to "turn off"
     ros::Subscriber subForce;           ///< Gives visual feedback for the magnitude (for the rectangle only) and direction of an applied force (represented as a 3D vector)
+    // Service servers
+    ros::ServiceServer turnOnOffSS;
     // Action servers
     actionlib::SimpleActionServer<iirob_led::BlinkyAction> blinkyAS;    ///< Handles Blinky goal messages
     actionlib::SimpleActionServer<iirob_led::PoliceAction> policeAS;
@@ -101,10 +104,16 @@ public:
 
     // Callbacks for all action servers and subscribers
     /**
-     * @brief turnLedOnOffCallback Turns on or off a given range of (or a single) LEDs
-     * @param led_onoff_msg
+     * @brief setLedRangeCallback Sets a given range of (or a single) LEDs to a given color
+     * @param led_setRange
      */
-    void turnLedOnOffCallback(const iirob_led::TurnLedsOnOff::ConstPtr& led_onoff_msg);
+    void setLedRangeCallback(const iirob_led::SetLedRange::ConstPtr& led_setRange_msg);
+
+    /**
+     * @brief turnOnOffCallback Turns off all LEDs (cross OR rectangle depending on which inheritig class is using this callback)
+     * @param turnOnOff_msg
+     */
+    bool turnOnOffCallback(iirob_led::TurnOnOff::Request& turnOnOff_Req_msg, iirob_led::TurnOnOff::Response& turnOnOff_Resp_msg);
 
     /**
      * @brief blinkyCallback processes BlinkyActionGoal messages - it turns on and off a give stripe of LEDs

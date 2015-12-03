@@ -22,12 +22,13 @@ find_package(catkin REQUIRED COMPONENTS
 add_service_files(
   FILES
   SetLedDirectory.srv
+  TurnOnOff.srv
 )
 
 add_message_files(
   FILES
   DirectionWithForce.msg
-  TurnLedsOnOff.msg
+  SetLedRange.msg
 )
 
 add_action_files(

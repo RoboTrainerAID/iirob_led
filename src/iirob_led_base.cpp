@@ -25,10 +25,12 @@ IIROB_LED_Base::IIROB_LED_Base(ros::NodeHandle nodeHandle, std::string const& _p
 
     _scalingFactor = scalingFactor(0, maxForce, 0, maxForceLeds);
 
-    subTurnLedsOnOff = nodeHandle.subscribe("led_onoff", 10, &IIROB_LED_Base::turnLedOnOffCallback, this);
+    subSetLedRange = nodeHandle.subscribe("led_setRange", 10, &IIROB_LED_Base::setLedRangeCallback, this);
     ROS_INFO("led_onoff subscriber started");
     subForce = nodeHandle.subscribe("led_force", 10, &IIROB_LED_Base::forceCallback, this);
     ROS_INFO("led_force subscriber started");
+
+    turnOnOffSS = nodeHandle.advertiseService<iirob_led::TurnOnOff::Request, iirob_led::TurnOnOff::Response>("turn_onoff", boost::bind(&IIROB_LED_Base::turnOnOffCallback, this, _1, _2));
 }
 
 IIROB_LED_Base::~IIROB_LED_Base() {
@@ -40,9 +42,10 @@ IIROB_LED_Base::~IIROB_LED_Base() {
         delete mLed;
     }
 
-    ROS_INFO("Shutting down action servers and subscribers");
-    subTurnLedsOnOff.shutdown();
+    ROS_INFO("Shutting down service and action servers and subscribers");
+    subSetLedRange.shutdown();
     subForce.shutdown();
+    turnOnOffSS.shutdown();
     blinkyAS.shutdown();
     policeAS.shutdown();
     fourRegionsAS.shutdown();
@@ -89,20 +92,20 @@ bool IIROB_LED_Base::getStatus() { return status; }
 // ...
 
 // TODO Convert to service
-void IIROB_LED_Base::turnLedOnOffCallback(const iirob_led::TurnLedsOnOff::ConstPtr& led_onoff_msg)
+void IIROB_LED_Base::setLedRangeCallback(const iirob_led::SetLedRange::ConstPtr& led_setRange_msg)
 {
     // Check if all or too many LEDs have been selected
-    if(!led_onoff_msg->color.r && !led_onoff_msg->color.g && !led_onoff_msg->color.b &&
-            ((led_onoff_msg->start_led <= 0 && led_onoff_msg->end_led >= mNumLeds) ||
-             (led_onoff_msg->start_led >= mNumLeds && led_onoff_msg->end_led <= 0)) ||
-              led_onoff_msg->num_leds > mNumLeds) {
+    if(!led_setRange_msg->color.r && !led_setRange_msg->color.g && !led_setRange_msg->color.b &&
+            ((led_setRange_msg->start_led <= 0 && led_setRange_msg->end_led >= mNumLeds) ||
+             (led_setRange_msg->start_led >= mNumLeds && led_setRange_msg->end_led <= 0)) ||
+              led_setRange_msg->num_leds > mNumLeds) {
         mLed->setAllRGBf(0, 0, 0, mNumLeds);
         return;
     }
 
-    int num_leds = led_onoff_msg->num_leds;
-    int start_led = led_onoff_msg->start_led;
-    int end_led = led_onoff_msg->end_led;
+    int num_leds = led_setRange_msg->num_leds;
+    int start_led = led_setRange_msg->start_led;
+    int end_led = led_setRange_msg->end_led;
     checkLimits(&start_led, &end_led);
     if(num_leds <= mNumLeds && num_leds > 0) {
         // Use the num_leds as offset from start_led to calculate the new end_led
@@ -112,7 +115,40 @@ void IIROB_LED_Base::turnLedOnOffCallback(const iirob_led::TurnLedsOnOff::ConstP
     else
         ROS_WARN("num_leds contains a non-zero value, which exceeds the total number of available LEDs in the strip. Falling back to end_led.");
 
-    mLed->setRangeRGBf(led_onoff_msg->color.r, led_onoff_msg->color.g, led_onoff_msg->color.b, mNumLeds, start_led, end_led);
+    mLed->setRangeRGBf(led_setRange_msg->color.r, led_setRange_msg->color.g, led_setRange_msg->color.b, mNumLeds, start_led, end_led);
+}
+
+bool IIROB_LED_Base::turnOnOffCallback(iirob_led::TurnOnOff::Request& turnOnOff_Req_msg, iirob_led::TurnOnOff::Response& turnOnOff_Resp_msg)
+{
+    bool res = true;
+    if(turnOnOff_Req_msg.turn_on)
+    {
+        if(!turnOnOff_Req_msg.color.r && !turnOnOff_Req_msg.color.g && !turnOnOff_Req_msg.color.b)
+        {
+            ROS_ERROR("Trying to turn all selected LEDs with R = G = B = 0");
+            res = false;
+        }
+        else res = mLed->setAllRGBf(turnOnOff_Req_msg.color.r, turnOnOff_Req_msg.color.g, turnOnOff_Req_msg.color.b, mNumLeds);
+    }
+    else
+    {
+        if(turnOnOff_Req_msg.color.r || turnOnOff_Req_msg.color.g || turnOnOff_Req_msg.color.b)
+            ROS_WARN("Color selected even though trying to turn all selected LEDs off");
+        res = mLed->setAllRGBf(0., 0., 0., mNumLeds);
+    }
+
+//    bool res = mLed->setAllRGBf(0, 0, 0, mNumLeds);
+//    turnOnOff_msg->success = res;
+//    turnOnOff_msg->message = (res) ? "Turning off all LEDs successful" : "Turning off all LEDs failed";
+
+    std::string resp_msg = "";
+    if(turnOnOff_Req_msg.turn_on) resp_msg = "on";
+    else resp_msg = "off";
+
+    turnOnOff_Resp_msg.message = "Turning " + resp_msg + " LEDs " + ((res) ? "successful" : "failed");
+    turnOnOff_Resp_msg.success = res;
+
+    return true;
 }
 
 void IIROB_LED_Base::blinkyCallback(const iirob_led::BlinkyGoal::ConstPtr& goal) {
