@@ -44,7 +44,7 @@ namespace iirob_hardware {
         /** Set RGB value of a given range of leds */
 		bool setAllRGB(unsigned char red, unsigned char green, unsigned char blue, int n, bool log=true);
 		/** As above, float [0.1], opt. logarithmic scaling */
-		bool setAllRGBf(float red, float green, float blue, int n, bool log=true);
+        bool setAllRGBf(float red, float green, float blue, int n, bool log=true); // TODO Make set all to call setRange but with all LEDs | sendTrigger
 		/** Set hue of all leds [0,1] */
 		bool setAllHue(float hue, int n, bool log=true);
 

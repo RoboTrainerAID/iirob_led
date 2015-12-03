@@ -101,7 +101,7 @@ void IIROB_LED_Rectangle::forceCallback(const iirob_led::DirectionWithForce::Con
     ROS_INFO("XY coordinates: [%.3f , %.3f]\t|\tForce (upper limit of %.3f): %.3f", x, y, maxForce, force);
     ROS_INFO("Led/Angle: %f | Angle: %frad (=%fdeg) | Translation (num of LEDs): %f | location (LED index): %d", ledPerDeg, angle, angle*180./M_PI, translationAlongStrip, direction);
 
-    mLed->setAllRGBf(0, 0, 0, mNumLeds);
+    mLed->setAllRGBf(0, 0, 0, mNumLeds); //
 
     float r = ledForceMsg->color.r, g = ledForceMsg->color.g, b = ledForceMsg->color.b;
 
