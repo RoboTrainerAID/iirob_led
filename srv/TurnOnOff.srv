@@ -1,0 +1,5 @@
+bool turn_on
+std_msgs/ColorRGBA color    # RGB values [0-1] for all LEDs (when turning on)
+---
+bool success
+string message
