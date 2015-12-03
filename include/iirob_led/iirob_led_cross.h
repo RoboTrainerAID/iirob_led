@@ -1,7 +1,5 @@
 #ifndef IIROB_LED_CROSS_H
 #define IIROB_LED_CROSS_H
-#include <iirob_led/PoliceAction.h>
-#include <iirob_led/DirectionWithForce.h>
 
 #include <geometry_msgs/Vector3.h>
 #include <geometry_msgs/Vector3Stamped.h>
@@ -65,7 +63,7 @@
 #define V_START                 V_UPPER_YPLUS_START
 #define V_END                   (CROSS_END - 1)
 
-#define MAX_NUM_LEDS_CROSS 7   ///< 6 + 1 (center) LEDs (note that the upper and bottom halves of the vertical LED strip actually have 8 and not 7 (like their horizontal counterparts) but we want to keep the symmetry)
+#define MAX_NUM_LEDS_CROSS 7   ///< 7 + 1 (center) LEDs (note that the upper and bottom halves of the vertical LED strip actually have 8 and not 7 (like their horizontal counterparts) but we want to keep the symmetry)
 
 /**
  * @brief The IIROB_LED_Cross class controls the LED strip mounted around the edges of the bottom platform of the SR2
@@ -73,16 +71,10 @@
 class IIROB_LED_Cross : public IIROB_LED_Base
 {
 private:
-    std::string localFrame;
-    double maxForce;
-
     tf2_ros::Buffer *buf;
     tf2_ros::TransformListener *tfl;
 
     // Note: The indexing starts from 0 and ends at 31 for the cross.
-    actionlib::SimpleActionServer<iirob_led::PoliceAction> policeAS;  ///< Handles Police goal messages
-    ros::Subscriber subForce;           ///< Gives visual feedback for the magnitude and direction of an applied force (represented as a 3D vector)
-    ros::Publisher pubForceTransformed; ///< Publishes the force retrieved by the subscriber but in the local frame
 
 public:
     /**
@@ -91,7 +83,7 @@ public:
      * @param _port Port as string
      * @param _m_numLeds Number of LEDs
      */
-    IIROB_LED_Cross(ros::NodeHandle nodeHandle, std::string const& _port, int const& _m_numLeds, std::string link, double maxForce);
+    IIROB_LED_Cross(ros::NodeHandle nodeHandle, std::string const& _port, int const& _mNumLeds, double maxForce, std::string link);
 
     /**
      * @brief Destructor turns off all LEDs and shuts down all action servers and subscribers
@@ -103,13 +95,13 @@ public:
      * @brief forceCallback
      * @param led_force_msg
      */
-    void forceCallback(const iirob_led::DirectionWithForce::ConstPtr& led_force_msg);
+    void forceCallback(const iirob_led::DirectionWithForce::ConstPtr& led_force_msg) override final;
 
     /**
      * @brief policeCallback processes PoliceActionGoal messages - it turns on and off a give stripe of LEDs mimicing a police light
      * @param goal
      */
-    void policeCallback(const iirob_led::PoliceGoal::ConstPtr& goal);
+    void policeCallback(const iirob_led::PoliceGoal::ConstPtr& goal) override final;
 };
 
 #endif // IIROB_LED_CROSS_H

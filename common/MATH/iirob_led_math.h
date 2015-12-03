@@ -34,7 +34,7 @@ double convert(double (*scalingFun)(double, double, double, double), double rang
  * @param value Number that we want to map from the first (old) to the second (new) range
  * @return scaled @value from the first (old) to the second (new) range
  */
-double convert(double scalingFactor, double rangeOld_min, double rangeNew_min, double value);
+double convert(double scalingFactor, double value, double rangeOld_min=0, double rangeNew_min=0);
 
 /**
  * @brief getVector2dLenght Calculates the lenght of the vector given its two components

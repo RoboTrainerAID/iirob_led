@@ -2,9 +2,9 @@ cmake_minimum_required(VERSION 2.8.3)
 project(iirob_led)
 
 #TODO Remove when testing is done
-set(CMAKE_BUILD_TYPE Debug)
+set(CMAKE_BUILD_TYPE Debug)   # Release
 
-set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS} -fPIC")   # This is important! See position independed code (->Google)
+set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS} -fPIC -std=c++11")   # This is important! See position independed code (->Google)
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_DEBUG} -Wall -s -O3 -g0") #-Os
 
 find_package(catkin REQUIRED COMPONENTS
@@ -81,13 +81,13 @@ add_library(rgbconverter common/RGBCONVERTER/RGBConverter.cpp)
 add_library(iirob_led_math common/MATH/iirob_led_math.cpp)
 # The iirob_led_base contains functionality that is used by others
 add_library(iirob_led_base src/iirob_led_base.cpp)
-target_link_libraries(iirob_led_base rgbconverter ledcommon ${catkin_LIBRARIES})
+target_link_libraries(iirob_led_base rgbconverter ledcommon iirob_led_math ${catkin_LIBRARIES})
 # The iirob_led_rectangular contains functionality for controlling the SR2 LED rectangular strip using ROS
 add_library(iirob_led_rectangle src/iirob_led_rectangle.cpp)
-target_link_libraries(iirob_led_rectangle iirob_led_base iirob_led_math)
+target_link_libraries(iirob_led_rectangle iirob_led_base)
 # The iirob_led_cross contains functionality for controlling the SR2 LED cross strip using ROS
 add_library(iirob_led_cross src/iirob_led_cross.cpp)
-target_link_libraries(iirob_led_cross iirob_led_base iirob_led_math)
+target_link_libraries(iirob_led_cross iirob_led_base)
 
 add_executable(${PROJECT_NAME}_node src/iirob_led_node.cpp)
 add_dependencies(${PROJECT_NAME}_node ${PROJECT_NAME}_generate_messages_cpp)

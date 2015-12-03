@@ -10,7 +10,7 @@ double convert(double (*scalingFun)(double, double, double, double), double rang
     return (scalingFun(rangeOld_min, rangeOld_max, rangeNew_min, rangeNew_max) * (value - rangeOld_min)) + rangeNew_min;
 }
 
-double convert(double scalingFactor, double rangeOld_min, double rangeNew_min, double value)
+double convert(double scalingFactor, double value, double rangeOld_min, double rangeNew_min)
 {
     return scalingFactor*(value - rangeOld_min) + rangeNew_min;
 }

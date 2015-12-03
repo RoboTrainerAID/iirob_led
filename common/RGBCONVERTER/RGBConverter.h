@@ -77,8 +77,7 @@ public:
      * @param _s    HSL saturation as floating point in the interval [0.0 .. 1.0]   (output)
      * @param _l    HSL lightness as floating point in the interval [0.0 .. 1.0]    (output)
      */
-    static void hslDegAndPercentageToIntervalZeroOne(float h, float s, float l, float *_h, float *_s, float *_l);   // TODO
-
+    static void hslDegAndPercentageToIntervalZeroOne(float h, float s, float l, float *_h, float *_s, float *_l);
     // Color value conversions
     /**
      * @brief rgbToHsl Converts a floating point RGB color value (red, green and blue) into its HSL (hue, saturation and lightness) representation (all components for both RGB and HSL are in the interval [0.0 .. 1.0]
