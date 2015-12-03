@@ -1,0 +1,23 @@
+<?xml version="1.0"?>
+<launch>
+    <!--
+      For target "rectangle" use ttyUSB0 with 384 LEDs
+      For target "cross" use ttyUSB1 with 32 LEDs
+    -->
+
+    <!--<arg name="port" default="/dev/ttyUSB0" />-->
+    <arg name="port" default="/dev/ttyUSB1" />
+    <!--<arg name="led_num" value="384" />-->
+    <arg name="led_num" value="32" />
+    <arg name="override" default="true" />
+    <!-- Type: "recangle" | "cross" -->
+    <arg name="type" default="cross" />
+
+    <node name="leds" pkg="iirob_led" type="iirob_led_node" output="screen">
+        <param name="port" value="$(arg port)" />
+        <param name="led_num" value="$(arg led_num)" />
+        <param name="override" value="$(arg override)" />
+	<param name="type" type="string" value="$(arg target)" />
+    </node>
+
+</launch>

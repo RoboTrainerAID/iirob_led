@@ -1,0 +1,16 @@
+# WARNING: this is not lightActionCallback_6
+std_msgs/ColorRGBA color    # RGB values [0-1] for all LEDs
+##############################################
+#        <---running direction----           #
+# Bunny: [start_led][][]...[][num_of_leds]   #
+##############################################
+int32 start_led                  # Starting position (head) of the strip
+int32 num_of_leds                # Offset (body) from the starting position - defines the rest of the strip
+int32 num_of_cycles              # Number of full circles (start_led to start_led position)
+#float64 cycle_duration          # Defines how fast a single cycle is completed; this also defines the step which the LED strip is "moving" with
+int32 leds_per_step	         # Number of LEDs to jump over (basically this determines how fast the bunny runs)
+bool reverse                     # The strip moves in the opposite direction (start_led becomes the last LED of the offset defined by num_of_leds and the vice versa)
+---
+int32 current_start_pos           # Number of blinks left until the goal is completed (change this to some decent feedback)
+---
+int32 current_start_pos           # Number of blinks left until the goal is completed

@@ -1,0 +1,21 @@
+<?xml version="1.0"?>
+<launch>
+    <arg name="port" default="/dev/ttyUSB1" />
+    <arg name="led_num" value="32" />
+    <arg name="override" default="true" />
+    <arg name="type" default="cross" />
+    <arg name="local_frame" default="led_cross_link" />
+    <arg name="max_force" default="10" />
+
+    <node pkg="tf2_ros" type="static_transform_publisher" name="led_cross_transform" args="-6 1 -3 0.7 -0.6 0.8 0.1 base_link $(arg local_frame)" /> <!-- Transform from /base_link to /led_link -->
+
+    <node name="leds_cross" pkg="iirob_led" type="iirob_led_node" output="screen">
+        <param name="port" value="$(arg port)" />
+        <param name="led_num" value="$(arg led_num)" />
+        <param name="override" value="$(arg override)" />
+	<param name="type" type="string" value="$(arg type)" />
+	<param name="local_frame" value="$(arg local_frame)" />
+	<param name="max_force" value="$(arg max_force)" />
+    </node>
+
+</launch>
