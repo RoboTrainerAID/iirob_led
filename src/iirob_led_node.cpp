@@ -15,7 +15,6 @@
 #include <geometry_msgs/Vector3.h>
 
 #include <string>
-//#include <cmath>
 
 #include "iirob_led_rectangle.h"
 #include "iirob_led_cross.h"

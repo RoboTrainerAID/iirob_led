@@ -1,23 +1,24 @@
 <?xml version="1.0"?>
 <launch>
-    <!--
-      For target "rectangle" use ttyUSB0 with 384 LEDs
-      For target "cross" use ttyUSB1 with 32 LEDs
-    -->
 
-    <!--<arg name="port" default="/dev/ttyUSB0" />-->
-    <arg name="port" default="/dev/ttyUSB1" />
-    <!--<arg name="led_num" value="384" />-->
-    <arg name="led_num" value="32" />
-    <arg name="override" default="true" />
-    <!-- Type: "recangle" | "cross" -->
-    <arg name="type" default="cross" />
+	<arg name="port" default="NO_PORT_DEFINED!" />
+	<arg name="led_num" default="0" />
+	<arg name="override" default="false" />
+	<arg name="type" default="stripe" />
+	<arg name="base_frame" default="base_link" />
+	<arg name="local_frame" default="led_link" />
+	<arg name="transformation" default="0 0 0 0 0 0 0" />
+	<arg name="max_force" default="0" />
 
-    <node name="leds" pkg="iirob_led" type="iirob_led_node" output="screen">
-        <param name="port" value="$(arg port)" />
-        <param name="led_num" value="$(arg led_num)" />
-        <param name="override" value="$(arg override)" />
-	<param name="type" type="string" value="$(arg target)" />
-    </node>
+	<node name="led_$(arg type)_transform" pkg="tf2_ros" type="static_transform_publisher" args="$(arg transformation) $(arg base_frame) $(arg local_frame)" />
+
+	<node name="leds_$(arg type)" pkg="iirob_led" type="iirob_led_node" output="screen">
+		<param name="port" value="$(arg port)" />
+		<param name="led_num" value="$(arg led_num)" />
+		<param name="override" value="$(arg override)" />
+		<param name="type" type="string" value="$(arg type)" />
+		<param name="local_frame" value="$(arg local_frame)" />
+		<param name="max_force" value="$(arg max_force)" />
+	</node>
 
 </launch>
