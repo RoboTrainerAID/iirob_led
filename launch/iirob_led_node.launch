@@ -19,6 +19,7 @@
 		<param name="type" type="string" value="$(arg type)" />
 		<param name="local_frame" value="$(arg local_frame)" />
 		<param name="max_force" value="$(arg max_force)" />
+		<remap from="led_force" to="/fts/force_values_transformed" />
 	</node>
 
 </launch>
