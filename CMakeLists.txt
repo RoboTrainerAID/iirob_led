@@ -79,16 +79,19 @@ add_library(ledcommon
 # The rgbconverter contains methods for manipulating colour data
 add_library(rgbconverter common/RGBCONVERTER/RGBConverter.cpp)
 # The iirob_led_math contains various math-related entities
-add_library(iirob_led_math common/MATH/iirob_led_math.cpp)
+add_library(${PROJECT_NAME}_math common/MATH/iirob_led_math.cpp)
 # The iirob_led_base contains functionality that is used by others
-add_library(iirob_led_base src/iirob_led_base.cpp)
-target_link_libraries(iirob_led_base rgbconverter ledcommon iirob_led_math ${catkin_LIBRARIES})
+add_library(${PROJECT_NAME}_base src/iirob_led_base.cpp)
+add_dependencies(${PROJECT_NAME}_base ${PROJECT_NAME}_generate_messages_cpp)
+target_link_libraries(${PROJECT_NAME}_base rgbconverter ledcommon ${PROJECT_NAME}_math ${catkin_LIBRARIES})
 # The iirob_led_rectangular contains functionality for controlling the SR2 LED rectangular strip using ROS
-add_library(iirob_led_rectangle src/iirob_led_rectangle.cpp)
-target_link_libraries(iirob_led_rectangle iirob_led_base)
+add_library(${PROJECT_NAME}_rectangle src/iirob_led_rectangle.cpp)
+add_dependencies(${PROJECT_NAME}_rectangle ${PROJECT_NAME}_generate_messages_cpp)
+target_link_libraries(${PROJECT_NAME}_rectangle ${PROJECT_NAME}_base)
 # The iirob_led_cross contains functionality for controlling the SR2 LED cross strip using ROS
-add_library(iirob_led_cross src/iirob_led_cross.cpp)
-target_link_libraries(iirob_led_cross iirob_led_base)
+add_library(${PROJECT_NAME}_cross src/iirob_led_cross.cpp)
+add_dependencies(${PROJECT_NAME}_cross ${PROJECT_NAME}_generate_messages_cpp)
+target_link_libraries(${PROJECT_NAME}_cross ${PROJECT_NAME}_base)
 
 add_executable(${PROJECT_NAME}_node src/iirob_led_node.cpp)
 add_dependencies(${PROJECT_NAME}_node ${PROJECT_NAME}_generate_messages_cpp)
