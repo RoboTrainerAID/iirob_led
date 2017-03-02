@@ -278,14 +278,7 @@ bool LEDStrip::setXRangeRGB(unsigned char* rgb, int numLeds, int start_led, int 
 
     // Send only when the sendTrigger flag is set
     if(sendTrigger) {
-        buf[0] = LEDStrip::START;
-        buf[1] = (char)(numLeds>>8);
-        buf[2] = (char)numLeds;
-        buf[numLeds*3+3] = LEDStrip::END;
-
-        ok &= send(buf, numLeds*3+4);
-        ok &= receive(buf, 1);
-        ok &= (buf[0]==LEDStrip::OK);
+        triggerSend(numLeds);
     }
 
     return ok;
@@ -343,4 +336,19 @@ bool LEDStrip::withinRange(int totNumLeds, int start_led, int end_led) {
     if(start_led < 0 || end_led < 0) return false;                   // Underflow
     if(start_led > totNumLeds || end_led > totNumLeds) return false; // Overflow
     return true;
+}
+
+bool LEDStrip::triggerSend(int numLeds) {
+        bool ok = true;
+
+        buf[0] = LEDStrip::START;
+        buf[1] = (char)(numLeds>>8);
+        buf[2] = (char)numLeds;
+        buf[numLeds*3+3] = LEDStrip::END;
+
+        ok &= send(buf, numLeds*3+4);
+        ok &= receive(buf, 1);
+        ok &= (buf[0]==LEDStrip::OK);
+
+        return ok;
 }

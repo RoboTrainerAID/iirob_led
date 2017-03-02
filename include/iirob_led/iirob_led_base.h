@@ -16,6 +16,8 @@
 
 #include <std_msgs/String.h>
 #include <std_msgs/ColorRGBA.h>
+#include <sensor_msgs/Image.h>
+#include <sensor_msgs/image_encodings.h>
 
 #include "LEDStrip.h"
 #include "RGBConverter.h"
@@ -54,6 +56,7 @@ protected:
     int stepsPerFadeCycle;   ///< Determines the granularity of the fading (the greater the value, the more fluent the HSV fade-effect will be)
     // Subscribers
     ros::Subscriber subSetLedRange;   ///< Allows setting given range of (or a single) LEDs to a specific color with (0,0,0) being equal to "turn off"
+    ros::Subscriber subSetLeds; ///< Allows setting all LEDs as Image. Think of RGB display.
     ros::Subscriber subForce;           ///< Gives visual feedback for the magnitude (for the rectangle only) and direction of an applied force (represented as a 3D vector)
     // Service servers
     ros::ServiceServer turnOnOffSS;
@@ -105,9 +108,15 @@ public:
     // Callbacks for all action servers and subscribers
     /**
      * @brief setLedRangeCallback Sets a given range of (or a single) LEDs to a given color
-     * @param led_setRange
+     * @param led_setRange_msg
      */
     void setLedRangeCallback(const iirob_led::SetLedRange::ConstPtr& led_setRange_msg);
+
+    /**
+     * @brief setLedsCallback Sets all LED with Image message. Think of RGB display.
+     * @param msg
+     */
+    void setLedsCallback(const sensor_msgs::Image::ConstPtr& msg);
 
     /**
      * @brief turnOnOffCallback Turns off all LEDs (cross OR rectangle depending on which inheritig class is using this callback)

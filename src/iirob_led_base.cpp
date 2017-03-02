@@ -26,15 +26,17 @@ IIROB_LED_Base::IIROB_LED_Base(ros::NodeHandle nodeHandle, std::string const& _p
     _scalingFactor = scalingFactor(0, maxForce, 0, maxForceLeds);
 
     subSetLedRange = nodeHandle.subscribe("led_setRange", 10, &IIROB_LED_Base::setLedRangeCallback, this);
-    ROS_INFO("led_onoff subscriber started");
+    ROS_DEBUG("led_onoff subscriber started");
+    subSetLeds = nodeHandle.subscribe("led_setLeds", 10, &IIROB_LED_Base::setLedsCallback, this);
+    ROS_DEBUG("led_setLeds subscriber started");
     subForce = nodeHandle.subscribe("led_force", 10, &IIROB_LED_Base::forceCallback, this);
-    ROS_INFO("led_force subscriber started");
+    ROS_DEBUG("led_force subscriber started");
 
     turnOnOffSS = nodeHandle.advertiseService<iirob_led::TurnOnOff::Request, iirob_led::TurnOnOff::Response>("turn_onoff", boost::bind(&IIROB_LED_Base::turnOnOffCallback, this, _1, _2));
 }
 
 IIROB_LED_Base::~IIROB_LED_Base() {
-    ROS_INFO("Turning all LEDs off");
+    ROS_DEBUG("Turning all LEDs off");
     // Turn all LEDs off and delete the m_led
     if (mLed) {
         mLed->setAllRGBf(0, 0, 0, mNumLeds);
@@ -42,7 +44,7 @@ IIROB_LED_Base::~IIROB_LED_Base() {
         delete mLed;
     }
 
-    ROS_INFO("Shutting down service and action servers and subscribers");
+    ROS_DEBUG("Shutting down service and action servers and subscribers");
     subSetLedRange.shutdown();
     subForce.shutdown();
     turnOnOffSS.shutdown();
@@ -68,17 +70,17 @@ bool IIROB_LED_Base::init(std::string const& port, int const& m_numLeds) {
         //m_led->setAllRGBf(0, 0, 0, m_numLeds);
         //m_led->setUniRGB(0, 0, 0);
 
-        ROS_INFO("%s: IIROB-LED action server started", ros::this_node::getName().c_str());
-        ROS_INFO("Number of LEDs: %d", m_numLeds);
+        ROS_DEBUG("%s: IIROB-LED action server started", ros::this_node::getName().c_str());
+        ROS_DEBUG("Number of LEDs: %d", m_numLeds);
 
         blinkyAS.start();
-        ROS_INFO("blinky action server started");
+        ROS_DEBUG("blinky action server started");
         policeAS.start();
-        ROS_INFO("police action server started");
+        ROS_DEBUG("police action server started");
         fourRegionsAS.start();
-        ROS_INFO("four_regions action server started");
+        ROS_DEBUG("four_regions action server started");
         chaserLightAS.start();
-        ROS_INFO("chaser_light action server started");
+        ROS_DEBUG("chaser_light action server started");
         return true;
     }
     return false;
@@ -116,6 +118,35 @@ void IIROB_LED_Base::setLedRangeCallback(const iirob_led::SetLedRange::ConstPtr&
         ROS_WARN("num_leds contains a non-zero value, which exceeds the total number of available LEDs in the strip. Falling back to end_led.");
 
     mLed->setRangeRGBf(led_setRange_msg->color.r, led_setRange_msg->color.g, led_setRange_msg->color.b, mNumLeds, start_led, end_led);
+}
+
+void IIROB_LED_Base::setLedsCallback(const sensor_msgs::Image::ConstPtr& msg)
+{
+    int pixel_size = sensor_msgs::image_encodings::numChannels(msg->encoding);
+
+    uint step = msg->step;
+    int led_index;
+
+    if (step == 0) {
+        step = msg->width*pixel_size;
+    }
+
+    if (msg->height*msg->width > mNumLeds)
+        return;
+
+    for (int i=0; i < msg->height; i++) {
+        for (int j=0; j < msg->width; j++) {
+            if (pixel_size == 4) {
+                if (msg->data[i*step+(j*pixel_size)+3] == 0) {
+                    continue;
+                }
+            }
+            led_index = (i*step + j);
+            mLed->setRangeRGB(msg->data[i*step+j*pixel_size], msg->data[i*step+j*pixel_size+1], msg->data[i*step+j*pixel_size+2],
+                                1, led_index, led_index, false, false, false);
+        }
+    }
+    mLed->triggerSend(mNumLeds);
 }
 
 bool IIROB_LED_Base::turnOnOffCallback(iirob_led::TurnOnOff::Request& turnOnOff_Req_msg, iirob_led::TurnOnOff::Response& turnOnOff_Resp_msg)
@@ -211,7 +242,7 @@ void IIROB_LED_Base::blinkyCallback(const iirob_led::BlinkyGoal::ConstPtr& goal)
         v = 0.0;    // Reset value (HSV) since this is the component that we will be working with
         // Fade in phase (if enabled)
         if(fade_in) {
-            ROS_INFO("Fade in");
+            ROS_DEBUG("Fade in");
             for(int current_step = 0; current_step < steps_per_fade_cycle; v += single_step, ++current_step) {
                 RGBConverter::hsvToRgb(h, s, v, &r, &g, &b);
                 mLed->setRangeRGBf(r, g, b, mNumLeds, start_led, end_led);
@@ -221,14 +252,14 @@ void IIROB_LED_Base::blinkyCallback(const iirob_led::BlinkyGoal::ConstPtr& goal)
         }
 
         // Full light phase
-        ROS_INFO("Full");
+        ROS_DEBUG("Full");
         mLed->setRangeRGBf(goal->color.r, goal->color.g, goal->color.b, mNumLeds, start_led, end_led);
         ros::Duration(new_duration).sleep();
 
         v = v_old;
         // Fade out phase (if enabled)
         if(fade_out) {
-            ROS_INFO("Fade out");
+            ROS_DEBUG("Fade out");
             for(int current_step = steps_per_fade_cycle-1; current_step >= 0; v -= single_step, --current_step) {
                 RGBConverter::hsvToRgb(h, s, v, &r, &g, &b);
                 mLed->setRangeRGBf(r, g, b, mNumLeds, start_led, end_led);

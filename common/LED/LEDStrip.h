@@ -111,6 +111,13 @@ namespace iirob_hardware {
          */
         bool setRangeRGBf(float red, float green, float blue, int totNumLeds, int start_led, int end_led, bool log=true, bool checkLimits=true, bool sendTrigger=true);
 
+        /**
+         * @brief setRangeRGBf Set RGB value of a given range of leds with color values (unsigned char). Generates @rgbtemp
+         * @param totNumLeds Total number of LEDs
+         * @return Return value of setRangeRGB(...)
+         */
+        bool triggerSend(int numLeds) ;
+
 	private:
 		LEDStrip() {}
 

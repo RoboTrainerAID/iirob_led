@@ -14,6 +14,7 @@ find_package(catkin REQUIRED COMPONENTS
   roscpp
   std_msgs
   geometry_msgs
+  sensor_msgs
   tf2
   tf2_ros
   tf2_geometry_msgs
@@ -51,7 +52,7 @@ catkin_package(
  INCLUDE_DIRS common/LED common/SERIAL common/RGBCONVERTER include/iirob_led
  LIBRARIES ${PROJECT_NAME}
  CATKIN_DEPENDS actionlib actionlib_msgs message_runtime roscpp std_msgs geometry_msgs tf2 tf2_ros tf2_geometry_msgs
- DEPENDS system_lib
+ # DEPENDS 
 )
 
 include_directories(
