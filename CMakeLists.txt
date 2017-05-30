@@ -1,8 +1,8 @@
 cmake_minimum_required(VERSION 2.8.3)
 project(iirob_led)
 
-#TODO Remove when testing is done
-set(CMAKE_BUILD_TYPE Debug)   # Release
+# Set this if you need to test
+#set(CMAKE_BUILD_TYPE Debug)   # Release
 
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS} -fPIC -std=c++11")   # This is important! See position independed code (->Google)
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_DEBUG} -Wall -s -O3 -g0") #-Os
@@ -50,7 +50,7 @@ generate_messages(
 
 catkin_package(
  INCLUDE_DIRS common/LED common/SERIAL common/RGBCONVERTER include/iirob_led
- LIBRARIES ${PROJECT_NAME}
+ LIBRARIES ledcommon rgbconverter ${PROJECT_NAME}_math ${PROJECT_NAME}_base ${PROJECT_NAME}_rectangle ${PROJECT_NAME}_cross
  CATKIN_DEPENDS actionlib actionlib_msgs message_runtime roscpp std_msgs geometry_msgs tf2 tf2_ros tf2_geometry_msgs
  # DEPENDS 
 )
@@ -112,16 +112,16 @@ target_link_libraries(${PROJECT_NAME}_node iirob_led_rectangle iirob_led_cross $
 ## Install ##
 #############
 
-install(TARGETS ledcommon rgbconverter iirob_led_rectangle iirob_led_cross ${PROJECT_NAME}_node
+install(TARGETS ledcommon rgbconverter ${PROJECT_NAME}_math ${PROJECT_NAME}_base ${PROJECT_NAME}_rectangle ${PROJECT_NAME}_cross ${PROJECT_NAME}_node
   ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
   LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
   RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 
-# install(DIRECTORY common/include
-#   DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION}
-# )
-#
+install(DIRECTORY common/include
+  DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION}
+)
+
 install(DIRECTORY launch
   DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
 )
