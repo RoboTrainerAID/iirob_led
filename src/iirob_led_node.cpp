@@ -7,7 +7,7 @@
 #include <iirob_led/FourRegionsAction.h>
 #include <iirob_led/ChaserLightAction.h>
 #include <iirob_led/SetLedDirectory.h>
-#include <iirob_led/DirectionWithForce.h>
+#include <iirob_led/ForceWithColor.h>
 #include <RGBConverter.h>
 
 #include <std_msgs/String.h>
@@ -16,8 +16,8 @@
 
 #include <string>
 
-#include "iirob_led_rectangle.h"
-#include "iirob_led_cross.h"
+#include "iirob_led/iirob_led_rectangle.h"
+#include "iirob_led/iirob_led_cross.h"
 
 int main(int argc, char **argv)
 {

@@ -1,7 +1,7 @@
 //#include <cmath>
 #include <math.h>
-#include "iirob_led_rectangle.h"
-#include "iirob_led_base.h"
+#include "iirob_led/iirob_led_rectangle.h"
+#include "iirob_led/iirob_led_base.h"
 
 IIROB_LED_Rectangle::IIROB_LED_Rectangle(ros::NodeHandle nodeHandle, std::string const& _port, int const& _mNumLeds, double _maxForce, std::string link)
     : IIROB_LED_Base::IIROB_LED_Base(nodeHandle, _port, _mNumLeds, _maxForce, MAX_NUM_LEDS_RECTANGLE, link)
@@ -17,16 +17,16 @@ IIROB_LED_Rectangle::~IIROB_LED_Rectangle() {
 }
 
 // Callbacks for all action servers and subscribers
-void IIROB_LED_Rectangle::forceCallback(const iirob_led::DirectionWithForce::ConstPtr& ledForceMsg) {
+void IIROB_LED_Rectangle::forceWithColorCallback(const iirob_led::ForceWithColor::ConstPtr& ledForceWithColorMsg) {
 
     // Process the transformation information
     geometry_msgs::Vector3Stamped forceIn, forceOut;
-    forceIn.vector = ledForceMsg->force.wrench.force;
+    forceIn.vector = ledForceWithColorMsg->force.wrench.force;
     geometry_msgs::TransformStamped tfStamped;
-    ROS_INFO("Transfroming from \"%s\" to \"%s\" (local frame for cross)", ledForceMsg->force.header.frame_id.c_str(), localFrame.c_str());
+    ROS_INFO("Transfroming from \"%s\" to \"%s\" (local frame for cross)", ledForceWithColorMsg->force.header.frame_id.c_str(), localFrame.c_str());
     try
     {
-        tfStamped = buf->lookupTransform(localFrame, ledForceMsg->force.header.frame_id, ros::Time(0));
+        tfStamped = buf->lookupTransform(localFrame, ledForceWithColorMsg->force.header.frame_id, ros::Time(0));
         tf2::doTransform(forceIn, forceOut, tfStamped);
     }
     catch(tf2::TransformException ex)
@@ -48,7 +48,7 @@ void IIROB_LED_Rectangle::forceCallback(const iirob_led::DirectionWithForce::Con
     double xScaled = convert(_scalingFactor, std::fabs(x));
     double yScaled = convert(_scalingFactor, std::fabs(y));
 
-    ROS_INFO("x: %f, y: %f | scaled x: %f, y: %f", x, y, xScaled, yScaled);
+    ROS_DEBUG("x: %f, y: %f | scaled x: %f, y: %f", x, y, xScaled, yScaled);
 
     double force = getVector2dLenght(xScaled, yScaled);
     if(force > maxForce)
@@ -70,8 +70,8 @@ void IIROB_LED_Rectangle::forceCallback(const iirob_led::DirectionWithForce::Con
     else if(forceRemainder < 0)                 // Example: force = 2.7, forceRounded = 3 => forceRemainder = force - forceRounded = 2.7 - 3 = -0.3 => we have rounded UP the force
         forceRemainder = 1 + forceRemainder;    // forceRemainder = 1 + (-0.3) = 0.7 => 3 LEDs with the last LED using V (in HSV) = 0.7*/
 
-    ROS_INFO("Max number of LEDs: %d", MAX_NUM_LEDS_RECTANGLE);
-    ROS_INFO("Force: %.3f | Rounded and int: %d", force, forceRounded);
+    ROS_DEBUG("Max number of LEDs: %d", MAX_NUM_LEDS_RECTANGLE);
+    ROS_DEBUG("Force: %.3f | Rounded and int: %d", force, forceRounded);
     if(forceRounded > maxForce)
     {
         ROS_ERROR("Received force is of greater magnitude than the set upper bound or exceed the numer of LEDs that can be displayed on each side of the platform | forceRounded(%d), forceMax(%d)", forceRounded, MAX_NUM_LEDS_RECTANGLE);
@@ -103,7 +103,7 @@ void IIROB_LED_Rectangle::forceCallback(const iirob_led::DirectionWithForce::Con
 
     mLed->setAllRGBf(0, 0, 0, mNumLeds); //
 
-    float r = ledForceMsg->color.r, g = ledForceMsg->color.g, b = ledForceMsg->color.b;
+    float r = ledForceWithColorMsg->color.r, g = ledForceWithColorMsg->color.g, b = ledForceWithColorMsg->color.b;
 
     if(forceRounded == 1)
     {

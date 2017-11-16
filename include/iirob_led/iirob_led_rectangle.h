@@ -9,7 +9,7 @@
 #include <tf2_ros/transform_broadcaster.h>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.h>
 
-#include "iirob_led_base.h"
+#include "iirob_led/iirob_led_base.h"
 
 /*
  * We combine the LED indexing (front right corner: LED[0] ... back right corner: LED[0+108] ... ... ... front right corner: LED[383])
@@ -97,7 +97,7 @@ public:
      * @brief forceCallback Retrieves a vector with a TF2 frame and lights up one of the corners of the platform based on the force and its direction represented by the vector
      * @param led_force_msg
      */
-    void forceCallback(const iirob_led::DirectionWithForce::ConstPtr& ledForceMsg) override final;
+    void forceWithColorCallback(const iirob_led::ForceWithColor::ConstPtr& ledForceMsg) override final;
 
     /**
      * @brief policeCallback processes PoliceActionGoal messages - it turns on and off a give stripe of LEDs mimicing a police light

@@ -1,6 +1,6 @@
 #include <cmath>
 #include "RGBConverter.h"
-#include "iirob_led_base.h"
+#include "iirob_led/iirob_led_base.h"
 
 IIROB_LED_Base::IIROB_LED_Base(ros::NodeHandle nodeHandle, std::string const& _port, int const& _mNumLeds, double _maxForce, int maxForceLeds, std::string link)
     : mLed(0), mMSec(1),
@@ -31,6 +31,8 @@ IIROB_LED_Base::IIROB_LED_Base(ros::NodeHandle nodeHandle, std::string const& _p
     ROS_DEBUG("led_setLeds subscriber started");
     subForce = nodeHandle.subscribe("led_force", 10, &IIROB_LED_Base::forceCallback, this);
     ROS_DEBUG("led_force subscriber started");
+    subForceWithColor = nodeHandle.subscribe("led_force_with_color", 10, &IIROB_LED_Base::forceWithColorCallback, this);
+    ROS_DEBUG("led_force_with_color subscriber started");
 
     turnOnOffSS = nodeHandle.advertiseService<iirob_led::TurnOnOff::Request, iirob_led::TurnOnOff::Response>("turn_onoff", boost::bind(&IIROB_LED_Base::turnOnOffCallback, this, _1, _2));
 }
@@ -408,5 +410,17 @@ void IIROB_LED_Base::chaserLightCallback(const iirob_led::ChaserLightGoal::Const
     chaserLightAS.publishFeedback(feedback);
     result.current_start_pos = head;
     chaserLightAS.setSucceeded(result);
+}
+
+void IIROB_LED_Base::forceCallback(const geometry_msgs::WrenchStamped::ConstPtr& ledForceMsg) {
+
+   boost::shared_ptr<iirob_led::ForceWithColor> forceWithColor;
+
+   forceWithColor->force = *ledForceMsg;
+   forceWithColor->color.r = 0.7;
+   forceWithColor->color.g = 1;
+   forceWithColor->color.b = 0.3;
+
+   this->forceWithColorCallback(forceWithColor);
 }
 

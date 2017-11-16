@@ -1,4 +1,4 @@
-#include "iirob_led_cross.h"
+#include "iirob_led/iirob_led_cross.h"
 
 // TODO Check if everywhere the duration parameter of a message is set properly (value > 0). Otherwise duration takes the default value from the message (=0), which equals infinity and node can only be stopped by escalating to SIGTERM
 
@@ -57,7 +57,7 @@ IIROB_LED_Cross::~IIROB_LED_Cross() {
 }
 
 // Callbacks for all action servers and subscribers
-void IIROB_LED_Cross::forceCallback(const iirob_led::DirectionWithForce::ConstPtr& ledForceMsg) {
+void IIROB_LED_Cross::forceWithColorCallback(const iirob_led::ForceWithColor::ConstPtr& ledForceMsg) {
 
     ROS_INFO("[Before transformation] | Force: %.3f | x(%f), y(%f)",
              getVector2dLenght(ledForceMsg->force.wrench.force.x, ledForceMsg->force.wrench.force.y),

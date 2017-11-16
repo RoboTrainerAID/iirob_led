@@ -28,7 +28,7 @@ add_service_files(
 
 add_message_files(
   FILES
-  DirectionWithForce.msg
+  ForceWithColor.msg
   SetLedRange.msg
 )
 
@@ -49,8 +49,8 @@ generate_messages(
 )
 
 catkin_package(
- INCLUDE_DIRS common/LED common/SERIAL common/RGBCONVERTER include/iirob_led
- LIBRARIES ${PROJECT_NAME}
+ INCLUDE_DIRS common/LED common/SERIAL common/RGBCONVERTER include
+ LIBRARIES ${PROJECT_NAME}_base ${PROJECT_NAME}_rectangle ${PROJECT_NAME}_cross
  CATKIN_DEPENDS actionlib actionlib_msgs message_runtime roscpp std_msgs geometry_msgs tf2 tf2_ros tf2_geometry_msgs
  # DEPENDS 
 )
@@ -60,7 +60,7 @@ include_directories(
   common/SERIAL
   common/RGBCONVERTER
   common/MATH
-  include/iirob_led
+  include
   ${catkin_INCLUDE_DIRS}
 )
 
@@ -69,22 +69,22 @@ add_definitions(-DIIROB_EXPORT=)
 ###########
 ## Build ##
 ###########
-# The ledcommon library contains all that is required to control the underlying hardware
-add_library(ledcommon
+# The ${PROJECT_NAME}_ledcommon library contains all that is required to control the underlying hardware
+add_library(${PROJECT_NAME}_ledcommon
   common/LED/LEDStrip.cpp
   common/LED/LEDModul.cpp
   common/SERIAL/SerialPort.cpp
   common/SERIAL/PosixSerialPort.cpp
   common/SERIAL/SerialPortFactory.cpp
 )
-# The rgbconverter contains methods for manipulating colour data
-add_library(rgbconverter common/RGBCONVERTER/RGBConverter.cpp)
+# The ${PROJECT_NAME}_rgbconvert contains methods for manipulating colour data
+add_library(${PROJECT_NAME}_rgbconvert common/RGBCONVERTER/RGBConverter.cpp)
 # The iirob_led_math contains various math-related entities
 add_library(${PROJECT_NAME}_math common/MATH/iirob_led_math.cpp)
 # The iirob_led_base contains functionality that is used by others
 add_library(${PROJECT_NAME}_base src/iirob_led_base.cpp)
 add_dependencies(${PROJECT_NAME}_base ${PROJECT_NAME}_generate_messages_cpp)
-target_link_libraries(${PROJECT_NAME}_base rgbconverter ledcommon ${PROJECT_NAME}_math ${catkin_LIBRARIES})
+target_link_libraries(${PROJECT_NAME}_base ${PROJECT_NAME}_rgbconvert ${PROJECT_NAME}_ledcommon ${PROJECT_NAME}_math ${catkin_LIBRARIES})
 # The iirob_led_rectangular contains functionality for controlling the SR2 LED rectangular strip using ROS
 add_library(${PROJECT_NAME}_rectangle src/iirob_led_rectangle.cpp)
 add_dependencies(${PROJECT_NAME}_rectangle ${PROJECT_NAME}_generate_messages_cpp)
@@ -97,14 +97,14 @@ target_link_libraries(${PROJECT_NAME}_cross ${PROJECT_NAME}_base)
 add_executable(${PROJECT_NAME}_node src/iirob_led_node.cpp)
 add_dependencies(${PROJECT_NAME}_node ${PROJECT_NAME}_generate_messages_cpp)
 #target_link_libraries(${PROJECT_NAME}_node iirob_led_rectangle iirob_led_cross ${catkin_LIBRARIES})
-target_link_libraries(${PROJECT_NAME}_node iirob_led_rectangle iirob_led_cross ${catkin_LIBRARIES})
+target_link_libraries(${PROJECT_NAME}_node ${PROJECT_NAME}_rectangle ${PROJECT_NAME}_cross ${catkin_LIBRARIES})
 
 # Playground using an action client (old version, may need update). Code is to be used only as an example
 #add_executable(${PROJECT_NAME}_node_client_test src/iirob_led_node_client_test.cpp)
 #add_dependencies(${PROJECT_NAME}_node_client_test ${PROJECT_NAME}_generate_messages_cpp)
 #target_link_libraries(${PROJECT_NAME}_node_client_test
 #  ${PROJECT_NAME}
-#  rgbconverter
+#  ${PROJECT_NAME}_rgbconvert
 #  ${catkin_LIBRARIES}
 #)
 
@@ -112,15 +112,15 @@ target_link_libraries(${PROJECT_NAME}_node iirob_led_rectangle iirob_led_cross $
 ## Install ##
 #############
 
-install(TARGETS ledcommon rgbconverter iirob_led_rectangle iirob_led_cross ${PROJECT_NAME}_node
+install(TARGETS ${PROJECT_NAME}_ledcommon ${PROJECT_NAME}_rgbconvert ${PROJECT_NAME}_rectangle ${PROJECT_NAME}_cross ${PROJECT_NAME}_node
   ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
   LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
   RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 
-# install(DIRECTORY common/include
-#   DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION}
-# )
+install(DIRECTORY include
+  DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION}
+)
 #
 install(DIRECTORY launch
   DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}

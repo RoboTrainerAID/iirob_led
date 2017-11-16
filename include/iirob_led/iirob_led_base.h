@@ -10,9 +10,11 @@
 #include <iirob_led/FourRegionsAction.h>
 #include <iirob_led/ChaserLightAction.h>
 #include <iirob_led/SetLedDirectory.h>
-#include <iirob_led/DirectionWithForce.h>
+#include <iirob_led/ForceWithColor.h>
 #include <iirob_led/SetLedRange.h>
 #include <iirob_led/TurnOnOff.h>
+
+#include <geometry_msgs/WrenchStamped.h>
 
 #include <std_msgs/String.h>
 #include <std_msgs/ColorRGBA.h>
@@ -58,6 +60,7 @@ protected:
     ros::Subscriber subSetLedRange;   ///< Allows setting given range of (or a single) LEDs to a specific color with (0,0,0) being equal to "turn off"
     ros::Subscriber subSetLeds; ///< Allows setting all LEDs as Image. Think of RGB display.
     ros::Subscriber subForce;           ///< Gives visual feedback for the magnitude (for the rectangle only) and direction of an applied force (represented as a 3D vector)
+    ros::Subscriber subForceWithColor;           ///< Gives visual feedback for the magnitude (for the rectangle only) and direction of an applied force (represented as a 3D vector)
     // Service servers
     ros::ServiceServer turnOnOffSS;
     // Action servers
@@ -149,10 +152,17 @@ public:
     virtual void policeCallback(const iirob_led::PoliceGoal::ConstPtr& goal) = 0;
 
     /**
-     * @brief forceCallback Retrieves a vector with a TF2 frame and displays it using the LED system (rectangle and cross)
+     * @brief forceCallback Retrieves a WrechStamped to be shown using the LED system (rectangle and cross)
      * @param led_force_msg
      */
-    virtual void forceCallback(const iirob_led::DirectionWithForce::ConstPtr& led_force_msg) = 0;
+    void forceCallback(const geometry_msgs::WrenchStamped::ConstPtr& ledForceMsg);
+    // TODO Add virtual policeCallback and start action server here
+
+    /**
+     * @brief forceCallback Retrieves a WrenchStamped with Color and displays it using the LED system (rectangle and cross)
+     * @param led_force_with_color_msg
+     */
+    virtual void forceWithColorCallback(const iirob_led::ForceWithColor::ConstPtr& ledForceWithColorMsg) = 0;
     // TODO Add virtual policeCallback and start action server here
 };
 

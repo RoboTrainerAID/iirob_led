@@ -9,7 +9,7 @@
 #include <tf2_ros/transform_broadcaster.h>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.h>
 
-#include "iirob_led_base.h" ///< For the class inheritance
+#include "iirob_led/iirob_led_base.h" ///< For the class inheritance
 
 /* SR2 cross devided into quadrants:
  *
@@ -95,7 +95,7 @@ public:
      * @brief forceCallback
      * @param led_force_msg
      */
-    void forceCallback(const iirob_led::DirectionWithForce::ConstPtr& led_force_msg) override final;
+    void forceWithColorCallback(const iirob_led::ForceWithColor::ConstPtr& led_force_msg) override final;
 
     /**
      * @brief policeCallback processes PoliceActionGoal messages - it turns on and off a give stripe of LEDs mimicing a police light
