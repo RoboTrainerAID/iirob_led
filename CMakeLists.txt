@@ -1,11 +1,17 @@
 cmake_minimum_required(VERSION 2.8.3)
 project(iirob_led)
 
-#TODO Remove when testing is done
-set(CMAKE_BUILD_TYPE Debug)   # Release
+# Set this if you need to test
+#set(CMAKE_BUILD_TYPE Debug)   # Release
 
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS} -fPIC -std=c++11")   # This is important! See position independed code (->Google)
-set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_DEBUG} -Wall -s -O3 -g0") #-Os
+set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_DEBUG} -Wall -s -O3 -g0")
+
+include(CheckCXXCompilerFlag)
+CHECK_CXX_COMPILER_FLAG("-std=c++11" Cpp11CompilerFlag)
+if (Cpp11CompilerFlag)
+	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
+endif()
 
 find_package(catkin REQUIRED COMPONENTS
   actionlib
@@ -121,7 +127,7 @@ install(TARGETS ${PROJECT_NAME}_ledcommon ${PROJECT_NAME}_rgbconvert ${PROJECT_N
 install(DIRECTORY include
   DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION}
 )
-#
+
 install(DIRECTORY launch
   DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
 )

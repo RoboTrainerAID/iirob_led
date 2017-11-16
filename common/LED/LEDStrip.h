@@ -3,7 +3,7 @@
 
 #include "../SERIAL/SerialPortFactory.h"
 
-#define MAX_LED 512
+#define MAX_LED 1024
 
 namespace iirob_hardware {
 
