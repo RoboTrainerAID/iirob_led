@@ -1,13 +1,14 @@
 <?xml version="1.0"?>
 <launch>
 
-	<arg name="port" default="/dev/ttyUSB1" />
+    <arg name="port" default="/dev/ttyUSB1" />
     <arg name="led_num" default="32" />
     <arg name="override" default="true" />
     <arg name="type" default="cross" />
+    <arg name="pub_transform" default="true"/>
     <arg name="base_frame" default="base_link" />
     <arg name="local_frame" default="led_cross_link" />
-    <arg name="transformation" default="0 0 0 0 0 0 0" />
+    <arg name="transformation" default="0 0 0 0 0 0 1" />
     <arg name="max_force" default="10" />
 
     <include file="$(find iirob_led)/launch/iirob_led_node.launch">
@@ -15,6 +16,7 @@
         <arg name="led_num" value="$(arg led_num)" />
         <arg name="override" value="$(arg override)" />
         <arg name="type" value="$(arg type)" />
+        <arg name="pub_transform" value="$(arg pub_transform)"/>
         <arg name="base_frame" value="$(arg base_frame)" />
         <arg name="local_frame" value="$(arg local_frame)" />
         <arg name="transformation" value="$(arg transformation)" />
