@@ -23,7 +23,7 @@ void IIROB_LED_Rectangle::forceWithColorCallback(const iirob_led::ForceWithColor
     geometry_msgs::Vector3Stamped forceIn, forceOut;
     forceIn.vector = ledForceWithColorMsg->force.wrench.force;
     geometry_msgs::TransformStamped tfStamped;
-    ROS_INFO("Transfroming from \"%s\" to \"%s\" (local frame for cross)", ledForceWithColorMsg->force.header.frame_id.c_str(), localFrame.c_str());
+    ROS_DEBUG("Transfroming from \"%s\" to \"%s\" (local frame for cross)", ledForceWithColorMsg->force.header.frame_id.c_str(), localFrame.c_str());
     try
     {
         tfStamped = buf->lookupTransform(localFrame, ledForceWithColorMsg->force.header.frame_id, ros::Time(0));
@@ -41,7 +41,7 @@ void IIROB_LED_Rectangle::forceWithColorCallback(const iirob_led::ForceWithColor
 
     if(x == 0 && y == 0)
     {
-        ROS_WARN("Both x and y coordinates equal zero which does not allow visualization in 2D space.");
+        ROS_DEBUG("Both x and y coordinates equal zero which does not allow visualization in 2D space.");
         return;
     }
 

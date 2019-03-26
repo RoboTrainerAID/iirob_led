@@ -414,13 +414,14 @@ void IIROB_LED_Base::chaserLightCallback(const iirob_led::ChaserLightGoal::Const
 
 void IIROB_LED_Base::forceCallback(const geometry_msgs::WrenchStamped::ConstPtr& ledForceMsg) {
 
-   boost::shared_ptr<iirob_led::ForceWithColor> forceWithColor;
-
-   forceWithColor->force = *ledForceMsg;
-   forceWithColor->color.r = 0.7;
-   forceWithColor->color.g = 1;
-   forceWithColor->color.b = 0.3;
-
-   this->forceWithColorCallback(forceWithColor);
+   boost::shared_ptr<iirob_led::ForceWithColor> p_forceWithColor;
+   p_forceWithColor.reset(new iirob_led::ForceWithColor());
+   
+   p_forceWithColor->force.header = ledForceMsg->header;
+   p_forceWithColor->color.r = 0.7;
+   p_forceWithColor->color.g = 1;
+   p_forceWithColor->color.b = 0.3;
+   
+   this->forceWithColorCallback(p_forceWithColor);
 }
 
