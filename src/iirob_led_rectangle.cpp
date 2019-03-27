@@ -23,7 +23,7 @@ void IIROB_LED_Rectangle::forceWithColorCallback(const iirob_led::ForceWithColor
     geometry_msgs::Vector3Stamped forceIn, forceOut;
     forceIn.vector = ledForceWithColorMsg->force.wrench.force;
     geometry_msgs::TransformStamped tfStamped;
-    ROS_DEBUG("Transfroming from \"%s\" to \"%s\" (local frame for cross)", ledForceWithColorMsg->force.header.frame_id.c_str(), localFrame.c_str());
+    ROS_DEBUG("Transforming from \"%s\" to \"%s\" (local frame for cross)", ledForceWithColorMsg->force.header.frame_id.c_str(), localFrame.c_str());
     try
     {
         tfStamped = buf->lookupTransform(localFrame, ledForceWithColorMsg->force.header.frame_id, ros::Time(0));
@@ -98,8 +98,8 @@ void IIROB_LED_Rectangle::forceWithColorCallback(const iirob_led::ForceWithColor
         else if(!y && x < 0) direction = RECT_BACK;
     }
 
-    ROS_INFO("XY coordinates: [%.3f , %.3f]\t|\tForce (upper limit of %.3f): %.3f", x, y, maxForce, force);
-    ROS_INFO("Led/Angle: %f | Angle: %frad (=%fdeg) | Translation (num of LEDs): %f | location (LED index): %d", ledPerDeg, angle, angle*180./M_PI, translationAlongStrip, direction);
+    ROS_DEBUG("XY coordinates: [%.3f , %.3f]\t|\tForce (upper limit of %.3f): %.3f", x, y, maxForce, force);
+    ROS_DEBUG("Led/Angle: %f | Angle: %frad (=%fdeg) | Translation (num of LEDs): %f | location (LED index): %d", ledPerDeg, angle, angle*180./M_PI, translationAlongStrip, direction);
 
     mLed->setAllRGBf(0, 0, 0, mNumLeds); //
 

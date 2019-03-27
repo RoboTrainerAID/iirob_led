@@ -418,6 +418,7 @@ void IIROB_LED_Base::forceCallback(const geometry_msgs::WrenchStamped::ConstPtr&
    p_forceWithColor.reset(new iirob_led::ForceWithColor());
    
    p_forceWithColor->force.header = ledForceMsg->header;
+   p_forceWithColor->force.wrench = ledForceMsg->wrench;
    p_forceWithColor->color.r = 0.7;
    p_forceWithColor->color.g = 1;
    p_forceWithColor->color.b = 0.3;
