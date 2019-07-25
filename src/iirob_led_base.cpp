@@ -194,8 +194,10 @@ void IIROB_LED_Base::blinkyCallback(const iirob_led::BlinkyGoal::ConstPtr& goal)
     int num_leds = goal->num_leds;
     bool fade_in = goal->fade_in;
     bool fade_out = goal->fade_out;
+    
+    bool success = true;
 
-    ROS_WARN("Due to latency issues if duration_on is set low enough the resulting blinking will take longer. This applies to a greater extent if fade_in and/or fade_out are enabled. When disabled the reposnse is much more accurate.");
+    ROS_WARN_COND((fade_in || fade_out), "Due to latency issues if duration_on is set low enough the resulting blinking will take longer. This applies to a greater extent if fade_in and/or fade_out are enabled. When disabled the response is much more accurate.");
 
     // Check if override of end_led is possible
     if(num_leds != 0) { // num_leds always takes precendence over end_led whenever if is != 0 and doesn't exceed the total number of LEDs in the strip
@@ -239,8 +241,17 @@ void IIROB_LED_Base::blinkyCallback(const iirob_led::BlinkyGoal::ConstPtr& goal)
     const double single_step_duration = (goal->duration_on/4) / steps_per_fade_cycle; // the duration of a single step is derived from the duration of the fade cycle devided by the steps per cycle
     ROS_DEBUG("Single HSV step: %.5f | Single HSV step duration: %.10f | Steps per fade cycle: %d", single_step, single_step_duration, steps_per_fade_cycle);
 
-    for(int i = 0; i < goal->blinks; ++i, --blinks_left)
-    {
+    for(int i = 0; i < goal->blinks; ++i, --blinks_left) {
+            
+        if (blinkyAS.isPreemptRequested() || !ros::ok()) {
+                ROS_DEBUG("Blinky goal has been cancelled. (%d blinks would have remained)", blinks_left);
+                blinkyAS.setPreempted(); //set action server preempted, to accept new goals
+                feedback.blinks_left = blinks_left;
+                blinkyAS.publishFeedback(feedback);
+                success = false;
+                break;
+        }
+        
         v = 0.0;    // Reset value (HSV) since this is the component that we will be working with
         // Fade in phase (if enabled)
         if(fade_in) {
@@ -278,11 +289,12 @@ void IIROB_LED_Base::blinkyCallback(const iirob_led::BlinkyGoal::ConstPtr& goal)
         blinkyAS.publishFeedback(feedback);
     }
 
-    feedback.blinks_left = blinks_left;
-
-    mLed->setAllRGBf(0, 0, 0, mNumLeds);
-    result.blinks_left = blinks_left;
-    blinkyAS.setSucceeded(result);
+    mLed->setAllRGBf(0, 0, 0, mNumLeds); //set LED OFF
+    
+    if (success) {
+        result.blinks_left = blinks_left;
+        blinkyAS.setSucceeded(result);
+    }
 }
 
 void IIROB_LED_Base::fourRegionsCallback(const iirob_led::FourRegionsGoal::ConstPtr& goal) {
@@ -291,6 +303,7 @@ void IIROB_LED_Base::fourRegionsCallback(const iirob_led::FourRegionsGoal::Const
     int blinks_left = goal->blinks;
     int start_led = goal->start_led;
     int end_led = goal->end_led;
+    bool success = true;
 
     checkLimits(&start_led, &end_led);
 
@@ -327,6 +340,15 @@ void IIROB_LED_Base::fourRegionsCallback(const iirob_led::FourRegionsGoal::Const
 
     for(int i = 0; i < goal->blinks; ++i, --blinks_left)
     {
+            
+        if (blinkyAS.isPreemptRequested() || !ros::ok()) {
+                ROS_DEBUG("FourRegions goal has been cancelled. (%d blinks would have remained)", blinks_left);
+                fourRegionsAS.setPreempted(); //set action server preempted, to accept new goals
+                feedback.blinks_left = blinks_left;
+                fourRegionsAS.publishFeedback(feedback);
+                success = false;
+                break;
+        }
         // Set selected LEDs and turn them on
         mLed->setRangeRGBf(goal->color1.r, goal->color1.g, goal->color1.b, mNumLeds, start_ledRegion1, end_ledRegion1, true, true, false);
         mLed->setRangeRGBf(goal->color2.r, goal->color2.g, goal->color2.b, mNumLeds, start_ledRegion2, end_ledRegion2, true, true, false);
@@ -347,13 +369,16 @@ void IIROB_LED_Base::fourRegionsCallback(const iirob_led::FourRegionsGoal::Const
     feedback.blinks_left = blinks_left;
 
     mLed->setAllRGBf(0, 0, 0, mNumLeds);
-    result.blinks_left = blinks_left;
-    fourRegionsAS.setSucceeded(result);
+    if (success) {
+        result.blinks_left = blinks_left;
+        fourRegionsAS.setSucceeded(result);
+    }
 }
 
 void IIROB_LED_Base::chaserLightCallback(const iirob_led::ChaserLightGoal::ConstPtr& goal) {
     iirob_led::ChaserLightFeedback feedback;
     iirob_led::ChaserLightResult result;
+    bool success;
 
     int head = (goal->start_led < 0) ? 0 : goal->start_led;
     int offset = goal->num_of_leds;
@@ -377,6 +402,12 @@ void IIROB_LED_Base::chaserLightCallback(const iirob_led::ChaserLightGoal::Const
 
     int old_tail;  // will use this to turn off the trail after the strip has moved
     for(int current_cycle = 0; current_cycle < cycles; current_cycle++) {
+            if (chaserLightAS.isPreemptRequested() || !ros::ok()) {
+                    ROS_DEBUG("chaserLight goal has been cancelled. (%d cycles would have remained)", (cycles - current_cycle) );
+                chaserLightAS.setPreempted(); //set action server preempted, to accept new goals
+                success = false;
+                break;
+        }
         // Prepare for the cycle
         head = (goal->start_led < 0) ? 0 : goal->start_led;
         tail = (head - offset);
@@ -408,8 +439,10 @@ void IIROB_LED_Base::chaserLightCallback(const iirob_led::ChaserLightGoal::Const
     mLed->setAllRGBf(0, 0, 0, mNumLeds);
     feedback.current_start_pos = head;
     chaserLightAS.publishFeedback(feedback);
-    result.current_start_pos = head;
-    chaserLightAS.setSucceeded(result);
+    if (success) {
+        result.current_start_pos = head;
+        chaserLightAS.setSucceeded(result);
+    }
 }
 
 void IIROB_LED_Base::forceCallback(const geometry_msgs::WrenchStamped::ConstPtr& ledForceMsg) {
