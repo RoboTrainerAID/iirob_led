@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <launch>
 
-    <arg name="port" default="/dev/ttyUSB0" />
+    <arg name="port" default="/dev/ttyUSB1" />
     <arg name="led_num" default="384" />
     <arg name="override" default="true" />
     <arg name="type" default="rectangle" />
