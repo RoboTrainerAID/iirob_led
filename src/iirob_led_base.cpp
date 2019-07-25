@@ -25,13 +25,13 @@ IIROB_LED_Base::IIROB_LED_Base(ros::NodeHandle nodeHandle, std::string const& _p
 
     _scalingFactor = scalingFactor(0, maxForce, 0, maxForceLeds);
 
-    subSetLedRange = nodeHandle.subscribe("led_setRange", 10, &IIROB_LED_Base::setLedRangeCallback, this);
+    subSetLedRange = nodeHandle.subscribe("led_setRange", 1, &IIROB_LED_Base::setLedRangeCallback, this);
     ROS_DEBUG("led_onoff subscriber started");
-    subSetLeds = nodeHandle.subscribe("led_setLeds", 10, &IIROB_LED_Base::setLedsCallback, this);
+    subSetLeds = nodeHandle.subscribe("led_setLeds", 1, &IIROB_LED_Base::setLedsCallback, this);
     ROS_DEBUG("led_setLeds subscriber started");
-    subForce = nodeHandle.subscribe("/base/threshold_filtered", 10, &IIROB_LED_Base::forceCallback, this);
+    subForce = nodeHandle.subscribe("/base/threshold_filtered",1 , &IIROB_LED_Base::forceCallback, this);
     ROS_DEBUG("led_force subscriber started");
-    subForceWithColor = nodeHandle.subscribe("led_force_with_color", 10, &IIROB_LED_Base::forceWithColorCallback, this);
+    subForceWithColor = nodeHandle.subscribe("led_force_with_color", 1, &IIROB_LED_Base::forceWithColorCallback, this);
     ROS_DEBUG("led_force_with_color subscriber started");
 
     turnOnOffSS = nodeHandle.advertiseService<iirob_led::TurnOnOff::Request, iirob_led::TurnOnOff::Response>("turn_onoff", boost::bind(&IIROB_LED_Base::turnOnOffCallback, this, _1, _2));
