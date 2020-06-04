@@ -19,16 +19,16 @@
  * 2)both axes are unequal to 0 - in this case we have to calculate atan2()
  *
  * The way the platform currently moves is as follows:
- * -y : move to the right (the side where the kinect is mounted)
- * +y : move to the left
- * +x : move forwards (the side where the on/off key is)
+ * +x : move forwards
  * -x : move backwards
+ * +y : move to the left
+ * -y : move to the right
  *
  * We define a coordinate system with its center being located in the center of the platform and
- * its first quadrant (+x,+y) being located at the fron
+ * its first quadrant (+x,+y) being located at the front
  *
- *               FRONT (0 DEG) [key_switch]
- *   [0],[383]    +x        ______SR2
+ *               FRONT (0 DEG)
+ *   [0],[num_led]    +x        ______SR2
  *         \  _____|_____  / __________unit circle
  *          \/     |     \/ /
  *          /|-----|-----|\/
@@ -77,6 +77,8 @@ class IIROB_LED_Rectangle : public IIROB_LED_Base
 private:
     tf2_ros::Buffer *buf;
     tf2_ros::TransformListener *tfl;
+
+    uint rect_front_const_, rect_back_const_, rect_left_const_, rect_right_const_;
 
 public:
     /**

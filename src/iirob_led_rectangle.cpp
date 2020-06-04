@@ -9,6 +9,36 @@ IIROB_LED_Rectangle::IIROB_LED_Rectangle(ros::NodeHandle nodeHandle, std::string
     // Initialize the tf2-related components
     buf = new tf2_ros::Buffer();
     tfl = new tf2_ros::TransformListener(*buf, nodeHandle);
+
+    ros::NodeHandle nh("~");
+
+    int rect_left_len, rect_back_len, rect_right_len, rect_front_len;
+
+    if (!nh.hasParam("rect_left_len")) {
+        ROS_WARN("Rectange parameters 'rect_left_len' not found. Using default values");
+    }
+
+    nh.param("rect_left_len", rect_left_len, -1);
+    nh.param("rect_back_len", rect_back_len, -1);
+    nh.param("rect_right_len", rect_right_len, -1);
+    nh.param("rect_front_len", rect_front_len, -1);
+
+    if (rect_left_len == -1 or rect_back_len == -1 or rect_right_len == -1 or rect_front_len == -1)
+    {
+        ROS_WARN("Rectange parameters 'rect_*_len' set to -1. Using default values");
+        rect_front_const_ = RECT_FRONT;
+        rect_back_const_ = RECT_BACK;
+        rect_left_const_ = RECT_LEFT;
+        rect_right_const_ = RECT_RIGHT;
+    }
+    else
+    {
+        rect_front_const_ = rect_left_len + rect_back_len + rect_right_len + rect_front_len/2;
+        rect_back_const_ = rect_left_len + rect_back_len/2;
+        rect_left_const_ = rect_left_len/2;
+        rect_right_const_ = (rect_left_len - 1) + rect_back_len + rect_right_len/2;
+    }
+
 }
 
 IIROB_LED_Rectangle::~IIROB_LED_Rectangle() {
@@ -88,14 +118,14 @@ void IIROB_LED_Rectangle::forceWithColorCallback(const iirob_led::ForceWithColor
         angle = atan2(y,x);  // Angle in radians
         ledPerDeg = mNumLeds/360.;
         translationAlongStrip = (angle*180./M_PI) * ledPerDeg;
-        direction = (int)round(RECT_FRONT + translationAlongStrip) % mNumLeds;
+        direction = (int)round(rect_front_const_ + translationAlongStrip) % mNumLeds;
     }
     else
     {
-        if(!x  && y < 0) direction = RECT_RIGHT;
-        else if(!x && y > 0) direction = RECT_LEFT;
-        else if(!y && x > 0) direction = RECT_FRONT;
-        else if(!y && x < 0) direction = RECT_BACK;
+        if(!x  && y < 0) direction = rect_right_const_;
+        else if(!x && y > 0) direction = rect_left_const_;
+        else if(!y && x > 0) direction = rect_front_const_;
+        else if(!y && x < 0) direction = rect_back_const_;
     }
 
     ROS_DEBUG("XY coordinates: [%.3f , %.3f]\t|\tForce (upper limit of %.3f): %.3f", x, y, maxForce, force);

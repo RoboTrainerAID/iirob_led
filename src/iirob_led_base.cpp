@@ -29,7 +29,7 @@ IIROB_LED_Base::IIROB_LED_Base(ros::NodeHandle nodeHandle, std::string const& _p
     ROS_DEBUG("led_onoff subscriber started");
     subSetLeds = nodeHandle.subscribe("led_setLeds", 10, &IIROB_LED_Base::setLedsCallback, this);
     ROS_DEBUG("led_setLeds subscriber started");
-    subForce = nodeHandle.subscribe("/base/threshold_filtered", 10, &IIROB_LED_Base::forceCallback, this);
+    subForce = nodeHandle.subscribe("led_force", 10, &IIROB_LED_Base::forceCallback, this);
     ROS_DEBUG("led_force subscriber started");
     subForceWithColor = nodeHandle.subscribe("led_force_with_color", 10, &IIROB_LED_Base::forceWithColorCallback, this);
     ROS_DEBUG("led_force_with_color subscriber started");

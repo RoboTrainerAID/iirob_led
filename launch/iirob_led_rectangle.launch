@@ -10,17 +10,29 @@
     <arg name="local_frame" default="led_rectangle_link" />
     <arg name="transformation" default="0 0 0 0 0 0 1" />
     <arg name="max_force" default="50" />
+    <arg name="remap_force_topic" default="/leds_rectangle/led_force" />
+    <arg name="rect_left_len" default="-1" /> <!-- 0 is always front left corner, counting counter-clock weise -->
+    <arg name="rect_back_len" default="-1 " />
+    <arg name="rect_right_len" default="-1" />
+    <arg name="rect_front_len" default="-1 " />
+
+    <remap from="/leds_rectangle/led_force" to="$(arg remap_force_topic)" />
+
+    <param name="leds_$(arg type)/rect_left_len" value="$(arg rect_left_len)" />
+    <param name="leds_$(arg type)/rect_back_len" value="$(arg rect_back_len)" />
+    <param name="leds_$(arg type)/rect_right_len" value="$(arg rect_right_len)" />
+    <param name="leds_$(arg type)/rect_front_len" value="$(arg rect_front_len)" />
 
     <include file="$(find iirob_led)/launch/iirob_led_node.launch">
         <arg name="port" value="$(arg port)" />
-	<arg name="led_num" value="$(arg led_num)" />
-	<arg name="override" value="$(arg override)" />
-	<arg name="type" value="$(arg type)" />
+        <arg name="led_num" value="$(arg led_num)" />
+        <arg name="override" value="$(arg override)" />
+        <arg name="type" value="$(arg type)" />
         <arg name="pub_transform" value="$(arg pub_transform)"/>
-	<arg name="base_frame" value="$(arg base_frame)" />
-	<arg name="local_frame" value="$(arg local_frame)" />
-	<arg name="transformation" value="$(arg transformation)" />
-	<arg name="max_force" value="$(arg max_force)" />
+        <arg name="base_frame" value="$(arg base_frame)" />
+        <arg name="local_frame" value="$(arg local_frame)" />
+        <arg name="transformation" value="$(arg transformation)" />
+        <arg name="max_force" value="$(arg max_force)" />
     </include>
 
 </launch>

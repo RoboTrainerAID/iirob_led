@@ -14,12 +14,12 @@
     <node if="$(arg pub_transform)" name="led_$(arg type)_transform" pkg="tf2_ros" type="static_transform_publisher" args="$(arg transformation) $(arg base_frame) $(arg local_frame)" />
 
     <node name="leds_$(arg type)" pkg="iirob_led" type="iirob_led_node" output="screen">
-	<param name="port" value="$(arg port)" />
-	<param name="led_num" value="$(arg led_num)" />
-	<param name="override" value="$(arg override)" />
-	<param name="type" type="string" value="$(arg type)" />
-	<param name="local_frame" value="$(arg local_frame)" />
-	<param name="max_force" value="$(arg max_force)" />
+        <param name="port" value="$(arg port)" />
+        <param name="led_num" value="$(arg led_num)" />
+        <param name="override" value="$(arg override)" />
+        <param name="type" type="string" value="$(arg type)" />
+        <param name="local_frame" value="$(arg local_frame)" />
+        <param name="max_force" value="$(arg max_force)" />
     </node>
 
 </launch>
